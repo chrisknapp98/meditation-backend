@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"htw-berlin.de/meditation/config"
+	"htw-berlin.de/meditation/database"
 	"htw-berlin.de/meditation/router"
 )
 
@@ -18,8 +19,15 @@ func main() {
 	err := config.LoadENV()
 	if err != nil {
 		// return err
-		return
+		panic(err)
 	}
+
+	// start database
+	err = database.StartDatabase()
+	if err != nil {
+		panic(err)
+	}
+	defer database.CloseMongoDB()
 
 	// create app
 	app := fiber.New()
