@@ -26,9 +26,7 @@ func main() {
 
 	// attach middleware
 	app.Use(recover.New())
-	app.Use(logger.New(logger.Config{
-		Format: "[${ip}]:${port} ${status} - ${method} ${path} ${latency}\n",
-	}))
+	app.Use(logger.New())
 
 	// setup routes
 	router.SetupRoutes(app)
