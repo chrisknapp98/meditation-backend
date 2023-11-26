@@ -27,7 +27,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer database.CloseMongoDB()
+	defer database.CloseDatabase()
 
 	// create app
 	app := fiber.New()
