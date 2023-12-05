@@ -84,7 +84,7 @@ def create_meditation_session():
     max_heart_rate = data.get('maxHeartRate'),
     avg_heart_rate = data.get('avgHeartRate'),
     heart_rate_measurements = data.get('heartRateMeasurements'),
-    sessionMeta = SessionMeta(
+    session_meta = SessionMeta(
         is_haptic_feedback_enabled = data['sessionMeta'].get('isHapticFeedbackEnabled'),
         sound = data['sessionMeta'].get('sound'),
         ambient = data['sessionMeta'].get('ambient'),
@@ -113,6 +113,7 @@ class MeditationSession(db.Model):
     avg_heart_rate = db.Column(db.Integer, nullable=True)
     heart_rate_measurements = db.Column(db.JSON, nullable=False)
     session_meta_id = db.Column(db.Integer, db.ForeignKey('session_meta.id'), nullable=False)
+    session_meta = db.relationship('SessionMeta', back_populates='meditation_sessions', uselist=False)
 
     def to_dict(self):
         return {
@@ -138,7 +139,7 @@ class SessionMeta(db.Model):
     mandala = db.Column(db.String(255), nullable=True)
     breathing_pattern = db.Column(db.JSON, nullable=False)  # Use JSON type for breathing pattern
     breathing_pattern_multiplier = db.Column(db.Integer, nullable=False)
-    meditation_session = db.relationship('MeditationSession', backref='session_meta', uselist=False)
+    meditation_sessions = db.relationship('MeditationSession', back_populates='session_meta', uselist=False)
 
     def to_dict(self):
         return {
