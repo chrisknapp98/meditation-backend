@@ -21,8 +21,18 @@ def predict():
 @app.route('/meditations', methods=['GET'])
 def get_meditation_sessions():
     try:
+        # Get device_id from query parameters
+        device_id = request.args.get('deviceId')
+
         # Use joinedload to eager load the related SessionMeta
-        meditation_sessions = MeditationSession.query.options(joinedload(MeditationSession.session_meta)).all()
+        query = MeditationSession.query.options(joinedload(MeditationSession.session_meta))
+
+        # Filter by device_id if provided
+        if device_id:
+            query = query.filter_by(device_id=device_id)
+
+        # Execute the query
+        meditation_sessions = query.all()
 
         if not meditation_sessions:
             return jsonify({'message': 'No meditation sessions found'}), 404
