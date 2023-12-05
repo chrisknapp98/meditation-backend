@@ -25,7 +25,7 @@ def get_meditation_sessions():
         device_id = request.args.get('deviceId')
 
         # Use joinedload to eager load the related SessionMeta
-        query = MeditationSession.query.options(joinedload(MeditationSession.session_meta))
+        query = MeditationSession.query
 
         # Filter by device_id if provided
         if device_id:
@@ -85,7 +85,8 @@ class MeditationSession(db.Model):
                 'minHeartRate': self.min_heart_rate,
                 'maxHeartRate': self.max_heart_rate,
                 'avgHeartRate': self.avg_heart_rate,
-                'heartRateMeasurements': self.heart_rate_measurements
+                'heartRateMeasurements': self.heart_rate_measurements,
+                'sessionMeta': self.session_meta.to_dict() if self.session_meta else None
             },
         }
 
