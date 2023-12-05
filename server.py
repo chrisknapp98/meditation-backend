@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-from sqlalchemy.orm import joinedload
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://middleware:supersafepassword@localhost/meditation_db'
@@ -49,18 +48,48 @@ def get_meditation_sessions():
 
 @app.route('/meditation', methods=['POST'])
 def create_meditation_session():
-    # Parse JSON data from the request body
-    data = request.json
+    # Validate the request body
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Invalid request body'}), 400
 
-    # Create a new meditation session
-    # session = MeditationSession(title=data['title'], duration=data['duration'])
+    # Validate required fields in the request body
+    required_fields = ['deviceId', 'date', 'duration', 'heartRateMeasurements', 'sessionMeta']
+    required_fields_in_session_meta = ['isHapticFeedbackEnabled', 'breathingPattern', 'breathingPatternMultiplier']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'error': f'Missing required field: {field}'}), 400
     
-    # Add the session to the database
-    # db.session.add(session)
-    # db.session.commit()
+    for field in required_fields_in_session_meta:
+        if field not in data['sessionMeta']:
+            return jsonify({'error': f'Missing required field: {field} in sessionMeta'}), 400
 
-    # return success string 
-    return "Successfully saved meditation session."
+    # Your logic to create a meditation session goes here...
+    meditation_session = MeditationSession(
+    device_id = data.get('deviceId'),
+    date = datetime.strptime(data.get('date'), '%Y-%m-%dT%H:%M:%S.%fZ'),
+    duration = data.get('duration'),
+    time_until_relaxation = data.get('timeUntilRelaxation'),
+    min_heart_rate = data.get('minHeartRate'),
+    max_heart_rate = data.get('maxHeartRate'),
+    avg_heart_rate = data.get('avgHeartRate'),
+    heart_rate_measurements = data.get('heartRateMeasurements'),
+    sessionMeta = SessionMeta(
+        is_haptic_feedback_enabled = data['sessionMeta'].get('isHapticFeedbackEnabled'),
+        sound = data['sessionMeta'].get('sound'),
+        ambient = data['sessionMeta'].get('ambient'),
+        mandala = data['sessionMeta'].get('mandala'),
+        breathing_pattern = data['sessionMeta'].get('breathingPattern'),
+        breathing_pattern_multiplier = data['sessionMeta'].get('breathingPatternMultiplier')
+    )
+)
+
+    # Add the meditation session to the database
+    db.session.add(meditation_session)
+    db.session.commit()
+
+    return jsonify({'message': 'Meditation session created successfully'}), 201
+
 
 class MeditationSession(db.Model):
     __tablename__ = 'meditation_sessions'
