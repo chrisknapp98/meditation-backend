@@ -1,9 +1,19 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+database_user = os.getenv('DATABASE_USER')
+database_user_password = os.getenv('DATABASE_USER_PASSWORD')
+database_name = os.getenv('DATABASE_NAME')
+
+server_port = os.getenv('SERVER_PORT')
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://middleware:supersafepassword@localhost/meditation_db'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{database_user}:{database_user_password}@localhost/{database_name}'
 db = SQLAlchemy(app)
 
 @app.route('/predict', methods=['POST'])
@@ -142,11 +152,10 @@ class SessionMeta(db.Model):
 
 
 
-# Run on port 5001
 if __name__ == '__main__':
 
     # with app.app_context():
     #     db.drop_all()
     #     db.create_all()
 
-    app.run(port=5001, debug=True, threaded=True, host='0.0.0.0') 
+    app.run(port=server_port, debug=True, threaded=True, host='0.0.0.0') 
