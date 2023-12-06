@@ -13,7 +13,7 @@ and flask server.
 - create an `.env` file from `.env.template`
 - start containers and wait until they are healthy:
 
-`docker compose up -d`
+`docker compose up -d --wait`
 
 ## stop containers
 
