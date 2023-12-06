@@ -64,35 +64,49 @@ def create_meditation_session():
         return jsonify({'error': 'Invalid request body'}), 400
 
     # Validate required fields in the request body
-    required_fields = ['deviceId', 'date', 'duration', 'heartRateMeasurements', 'sessionMeta']
-    required_fields_in_session_meta = ['isHapticFeedbackEnabled', 'breathingPattern', 'breathingPatternMultiplier']
+    required_fields = [
+        'deviceId', 
+        'date', 
+        'duration', 
+        'isCompleted', 
+        'isCanceled', 
+        'sessionPeriods',
+    ]
     for field in required_fields:
         if field not in data:
             return jsonify({'error': f'Missing required field: {field}'}), 400
     
-    for field in required_fields_in_session_meta:
-        if field not in data['sessionMeta']:
-            return jsonify({'error': f'Missing required field: {field} in sessionMeta'}), 400
+    required_fields_in_session_periods = [
+        'heartRateMeasurements',
+        'visualization',
+        'beatFrequency',
+        'breathingPattern', 
+        'breathingPatternMultiplier', 
+        'isHapticFeedbackEnabled', 
+    ]
+    for index, period in enumerate(data['sessionPeriods']):
+        for field in required_fields_in_session_periods:
+            if field not in period:
+                return jsonify({'error': f'Missing required field: {field} in session period at index {index}'}), 400
 
     # Your logic to create a meditation session goes here...
     meditation_session = MeditationSession(
-    device_id = data.get('deviceId'),
-    date = datetime.strptime(data.get('date'), '%Y-%m-%dT%H:%M:%S.%fZ'),
-    duration = data.get('duration'),
-    time_until_relaxation = data.get('timeUntilRelaxation'),
-    min_heart_rate = data.get('minHeartRate'),
-    max_heart_rate = data.get('maxHeartRate'),
-    avg_heart_rate = data.get('avgHeartRate'),
-    heart_rate_measurements = data.get('heartRateMeasurements'),
-    session_meta = SessionMeta(
-        is_haptic_feedback_enabled = data['sessionMeta'].get('isHapticFeedbackEnabled'),
-        sound = data['sessionMeta'].get('sound'),
-        ambient = data['sessionMeta'].get('ambient'),
-        mandala = data['sessionMeta'].get('mandala'),
-        breathing_pattern = data['sessionMeta'].get('breathingPattern'),
-        breathing_pattern_multiplier = data['sessionMeta'].get('breathingPatternMultiplier')
+        device_id=data.get('deviceId'),
+        date=datetime.strptime(data.get('date'), '%Y-%m-%dT%H:%M:%S.%fZ'),
+        duration=data.get('duration'),
+        is_completed=data.get('isCompleted'),
+        is_canceled=data.get('isCanceled'),
+        session_periods=[
+            SessionPeriod(
+                heart_rate_measurements=period.get('heartRateMeasurements'),
+                visualization=period.get('visualization'),
+                beat_frequency=period.get('beatFrequency'),
+                breathing_pattern=period.get('breathingPattern'),
+                breathing_pattern_multiplier=period.get('breathingPatternMultiplier'),
+                is_haptic_feedback_enabled=period.get('isHapticFeedbackEnabled')
+            ) for period in data.get('sessionPeriods')
+        ]
     )
-)
 
     # Add the meditation session to the database
     db.session.add(meditation_session)
@@ -107,56 +121,48 @@ class MeditationSession(db.Model):
     device_id = db.Column(db.String(36), nullable=False)
     date = db.Column(db.DateTime, nullable=False)
     duration = db.Column(db.Integer, nullable=False)
-    time_until_relaxation = db.Column(db.Integer, nullable=True)
-    min_heart_rate = db.Column(db.Integer, nullable=True)
-    max_heart_rate = db.Column(db.Integer, nullable=True)
-    avg_heart_rate = db.Column(db.Integer, nullable=True)
-    heart_rate_measurements = db.Column(db.JSON, nullable=False)
-    session_meta_id = db.Column(db.Integer, db.ForeignKey('session_meta.id'), nullable=False)
-    session_meta = db.relationship('SessionMeta', back_populates='meditation_sessions', uselist=False)
+    is_completed = db.Column(db.Boolean, nullable=False, default=False)
+    is_canceled = db.Column(db.Boolean, nullable=False, default=False)
+    session_periods = db.relationship('SessionPeriod', back_populates='meditation_session', cascade='all, delete-orphan')
 
     def to_dict(self):
         return {
-            'session': {
-                'deviceId': self.device_id,
-                'date': self.date.isoformat() if self.date else None,
-                'duration': self.duration,
-                'timeUntilRelaxation': self.time_until_relaxation,
-                'minHeartRate': self.min_heart_rate,
-                'maxHeartRate': self.max_heart_rate,
-                'avgHeartRate': self.avg_heart_rate,
-                'heartRateMeasurements': self.heart_rate_measurements,
-                'sessionMeta': self.session_meta.to_dict() if self.session_meta else None
-            },
+            'deviceId': self.device_id,
+            'date': self.date.isoformat() if self.date else None,
+            'duration': self.duration,
+            'isCompleted': self.is_completed,
+            'isCanceled': self.is_canceled,
+            'sessionPeriods': [period.to_dict() for period in self.session_periods]
         }
 
-class SessionMeta(db.Model):
-    __tablename__ = 'session_meta'
+
+class SessionPeriod(db.Model):
+    __tablename__ = 'session_periods'
     id = db.Column(db.Integer, primary_key=True)
+    meditation_session_id = db.Column(db.Integer, db.ForeignKey('meditation_sessions.id', ondelete='CASCADE'), nullable=False)
+    heart_rate_measurements = db.Column(db.JSON, nullable=False)
+    visualization = db.Column(db.String(255), nullable=True)
+    beat_frequency = db.Column(db.Float, nullable=True)
+    breathing_pattern = db.Column(db.JSON, nullable=False)
+    breathing_pattern_multiplier = db.Column(db.Float, nullable=False)
     is_haptic_feedback_enabled = db.Column(db.Boolean, nullable=False)
-    sound = db.Column(db.String(255), nullable=True)
-    ambient = db.Column(db.String(255), nullable=True)
-    mandala = db.Column(db.String(255), nullable=True)
-    breathing_pattern = db.Column(db.JSON, nullable=False)  # Use JSON type for breathing pattern
-    breathing_pattern_multiplier = db.Column(db.Integer, nullable=False)
-    meditation_sessions = db.relationship('MeditationSession', back_populates='session_meta', uselist=False)
+
+    meditation_session = db.relationship('MeditationSession', back_populates='session_periods')
 
     def to_dict(self):
         return {
-            'isHapticFeedbackEnabled': self.is_haptic_feedback_enabled,
-            'sound': self.sound,
-            'ambient': self.ambient,
-            'mandala': self.mandala,
+            'heartRateMeasurements': self.heart_rate_measurements,
+            'visualization': self.visualization,
+            'beatFrequency': self.beat_frequency,
             'breathingPattern': self.breathing_pattern,
-            'breathingPatternMultiplier': self.breathing_pattern_multiplier
+            'breathingPatternMultiplier': self.breathing_pattern_multiplier,
+            'isHapticFeedbackEnabled': self.is_haptic_feedback_enabled
         }
-
 
 
 if __name__ == '__main__':
-
     # with app.app_context():
     #     db.drop_all()
     #     db.create_all()
 
-    app.run(port=server_port, debug=True, threaded=True, host='0.0.0.0') 
+    app.run(port=server_port, debug=True, threaded=True, host='0.0.0.0')
