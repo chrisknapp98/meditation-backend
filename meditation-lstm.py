@@ -18,6 +18,7 @@ from matplotlib import pyplot
 # Constants
 ENABLE_LOG_TRAINING_RESULTS = True
 ENABLE_DETAILED_LOGGING = True
+DEFAULT_MODEL_FILE_NAME = "model.keras"
 
 
 #def _get_next_random_config():
@@ -44,7 +45,7 @@ def _get_sample_training_data(num_time_units=20):
     return np.array(training_data)
 
 def _load_model(user_id):
-    model_path = "models/" + user_id + "/model_checkpoint.h5"
+    model_path = "models/" + user_id + "/" + DEFAULT_MODEL_FILE_NAME
     if (os.path.exists(model_path)):
         print("Das Modell für den User " + user_id + " existiert bereits.")
         model = load_model(model_path)
@@ -131,8 +132,21 @@ def _plot_training_history(history):
     pyplot.show()
 
 def predict_next_heart_rate(session_data_two_time_units, user_id):
-    # bla
-    print("start")
+    model = _load_model(user_id)
+    if (model is None):
+        print("Fehler. User hat noch garkein Modell.")
+        return None
+
+    # Make sure the input data is equivalent to the time series length
+    assert session_data_two_time_units.shape[0] == 1, "Die Form der Daten entspricht nicht den Erwartungen (4 Datensätze)."
+    assert session_data_two_time_units.shape[0] == 4, "Die Form der Daten entspricht nicht den Erwartungen (4 Datensätze)."
+    assert session_data_two_time_units.shape[1] == 30, "Die Form der Daten entspricht nicht den Erwartungen (30 Time-Series-Merkmale)."
+
+    # Make prediction
+    prediction = model.predict(session_data_two_time_units)
+    print("Prediction für User " + user_id + " - " + str(prediction) + " (heart rate))")
+
+    return prediction
 
 # Make sure the shape of the training data is (40 x 4 x 15)
 def train_model_with_session_data(training_data, user_id):
@@ -155,12 +169,19 @@ def train_model_with_session_data(training_data, user_id):
     model = _load_model(user_id)
     X_train, y_train, X_test, y_test = _preprocess_training_data(training_data)
 
+    # Print all shapes
+    print("X_train shape: " + str(X_train.shape))
+    print("y_train shape: " + str(y_train.shape))
+    print("X_test shape: " + str(X_test.shape))
+    print("y_test shape: " + str(y_test.shape))
+
     if (model is None):
         # User has no model yet -> create a new one
         print("User hat noch kein Modell -> erstelle ein neues Modell")
 
-        # LSTM Model, every data point has shape 4x30 (input dimensions)
+        # LSTM Model, every data point has shape 4x15 (input dimensions)
         model = Sequential()
+
         model.add(InputLayer(input_shape=(4, 30)))
         model.add(LSTM(64))
         model.add(Dense(8, activation='relu'))
@@ -168,29 +189,60 @@ def train_model_with_session_data(training_data, user_id):
         model.summary()
         model.compile(loss='mae', optimizer='adam')
         history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
+
+        # Erstelle das Verzeichnis, wenn es nicht existiert
+        model_directory = "models/" + user_id
+        os.makedirs(model_directory, exist_ok=True)
     else:
         # User has a model -> load it and continue training
         print("User hat bereits ein Modell -> lade es und trainiere nach")
         history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
 
     # Save the model
-    model.save("models/"+ user_id +"/model_checkpoint.h5")
+    model.save("models/" + user_id + "/" + DEFAULT_MODEL_FILE_NAME)
 
     if (ENABLE_LOG_TRAINING_RESULTS):
         _plot_training_history(history)
 
 
 
-# Create sample training data for one meditation session (40 time units)
-training_data = _get_sample_training_data(num_time_units=40)
-training_data = np.array(training_data)
 
-print("Training data shape: " + str(training_data.shape))
-#print(str(training_data))
+# Test stuff
+MAKE_PREDICTION = True
+sample_user_id = "123"
 
-# Called after each meditation session
-sample_user_id = "745346"
+if (MAKE_PREDICTION):
 
-# 10 minutes of meditation -> 20 arrays of time series data (heart rate, sound in hz, visualisation type, breathing multiplier) [30 seconds each]
-# 20 x 4 x 15
-train_model_with_session_data(training_data, sample_user_id)
+    session_data_two_time_units_1 = np.array([
+        [80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 70, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220],
+        [31, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44],
+        [2, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 1, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2],
+        [0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 0.7, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2]
+    ])
+
+    print(session_data_two_time_units_1.shape)
+
+    # Array umformen zu (1, 4, 30)
+    reshaped_array = session_data_two_time_units_1[np.newaxis, :, :]
+    # Das Array in die Form (4, 30) umformen
+    #reshaped_array = session_data_two_time_units_1.reshape(4, 30)
+    #reshaped_array = session_data_two_time_units_1[np.newaxis, :, :]
+
+    #print(reshaped_array)
+
+
+    print(reshaped_array.shape)
+    # Vorhersage
+    prediction = predict_next_heart_rate(reshaped_array, sample_user_id)
+
+    print("hearth rate: " + str(prediction));
+else:
+    # Create sample training data for one meditation session (40 time units)
+    training_data = _get_sample_training_data(num_time_units=40)
+    training_data = np.array(training_data)
+
+    print("Training data shape: " + str(training_data.shape))
+    #print(str(training_data))
+
+    train_model_with_session_data(training_data, sample_user_id)
+
