@@ -35,7 +35,7 @@ def _get_sample_training_data(num_time_units=20):
 
     # Create two sample data session arrays
     for _ in range(num_time_units):
-        heart_rate = np.random.randint(70, 130, size=15)
+        heart_rate = np.random.randint(60, 110, size=15)
         sound_in_hz = np.random.randint(30, 41, size=15)
         visualisation_type = np.random.randint(0, 6, size=15)
         breathing_multiplier = np.random.uniform(0.8, 1.6, size=15)
@@ -209,16 +209,24 @@ def train_model_with_session_data(training_data, user_id):
 
 # Test stuff
 MAKE_PREDICTION = True
-sample_user_id = "12345"
+sample_user_id = "456"
 
 if (MAKE_PREDICTION):
 
+    # Beispiel prediction data
+    first_row = [60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80]
+    second_row = [30] * 15 + [32] * 15
+    third_row = [1] * 15 + [3] * 15
+    fourth_row = [1.2] * 15 + [0.8] * 15
+
+    # Gesamter Array
     session_data_two_time_units_1 = np.array([
-        [80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 70, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220],
-        [31, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44],
-        [2, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 1, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2],
-        [0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 0.7, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2]
+        first_row,
+        second_row,
+        third_row,
+        fourth_row
     ])
+
 
     print(session_data_two_time_units_1.shape)
 
@@ -241,7 +249,7 @@ else:
     training_data = _get_sample_training_data(num_time_units=40)
     training_data = np.array(training_data)
 
-    
+
 
     print("Training data shape: " + str(training_data.shape))
     #print(str(training_data))
