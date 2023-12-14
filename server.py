@@ -18,6 +18,29 @@ db = SQLAlchemy(app)
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    # Preprocessing missing values
+    # Länge der 4 Datenarrays -> 30 Werte pro Array
+    # Validierung der Werte der 4 Datenarrays -> 60-120, 30-40, 0-5, 0.8-1.6 (?)
+    # Ggf. fehlende Werte einfügen
+
+
+    # Parse JSON data from the request body
+    data = request.json
+
+    # Your model prediction logic here
+    result = {"prediction": "some_result"}
+
+    # Return the result as JSON
+    return jsonify(result)
+
+@app.route('/train_model', methods=['POST'])
+def predict():
+    # Preprocessing missing values
+    # Länge der 4 Datenarrays -> 15*20 = 300 Werte pro Array
+    # Validierung der Werte der 4 Datenarrays -> 60-120, 30-40, 0-5, 0.8-1.6 (?)
+    # Ggf. fehlende Werte einfügen
+
+
     # Parse JSON data from the request body
     data = request.json
 

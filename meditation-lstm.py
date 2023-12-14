@@ -138,9 +138,9 @@ def predict_next_heart_rate(session_data_two_time_units, user_id):
         return None
 
     # Make sure the input data is equivalent to the time series length
-    assert session_data_two_time_units.shape[0] == 1, "Die Form der Daten entspricht nicht den Erwartungen (4 Datensätze)."
-    assert session_data_two_time_units.shape[0] == 4, "Die Form der Daten entspricht nicht den Erwartungen (4 Datensätze)."
-    assert session_data_two_time_units.shape[1] == 30, "Die Form der Daten entspricht nicht den Erwartungen (30 Time-Series-Merkmale)."
+    assert session_data_two_time_units.shape[0] == 1, "Die Form der Daten entspricht nicht den Erwartungen (1 Datensätze)."
+    assert session_data_two_time_units.shape[1] == 4, "Die Form der Daten entspricht nicht den Erwartungen (4 Datensätze)."
+    assert session_data_two_time_units.shape[2] == 30, "Die Form der Daten entspricht nicht den Erwartungen (30 Time-Series-Merkmale)."
 
     # Make prediction
     prediction = model.predict(session_data_two_time_units)
@@ -209,7 +209,7 @@ def train_model_with_session_data(training_data, user_id):
 
 # Test stuff
 MAKE_PREDICTION = True
-sample_user_id = "123"
+sample_user_id = "12345"
 
 if (MAKE_PREDICTION):
 
@@ -240,6 +240,8 @@ else:
     # Create sample training data for one meditation session (40 time units)
     training_data = _get_sample_training_data(num_time_units=40)
     training_data = np.array(training_data)
+
+    
 
     print("Training data shape: " + str(training_data.shape))
     #print(str(training_data))
