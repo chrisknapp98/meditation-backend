@@ -7,6 +7,7 @@ from tensorflow.keras.losses import MeanSquaredError
 from tensorflow.keras.metrics import RootMeanSquaredError
 from tensorflow.keras.optimizers import Adam
 from keras.models import load_model
+import app_config as app_config
 
 from matplotlib import pyplot
 # WARNING:absl:At this time, the v2.11+ optimizer `tf.keras.optimizers.Adam` runs slowly on M1/M2 Macs, please use the legacy Keras optimizer instead, located at `tf.keras.optimizers.legacy.Adam`.
@@ -16,9 +17,6 @@ from matplotlib import pyplot
 # One element in an array represents two seconds of meditation
 
 # Constants
-ENABLE_LOG_TRAINING_RESULTS = True
-ENABLE_DETAILED_LOGGING = True
-DEFAULT_MODEL_FILE_NAME = "model.keras"
 
 
 #def _get_next_random_config():
@@ -45,7 +43,7 @@ def _get_sample_training_data(num_time_units=20):
     return np.array(training_data)
 
 def _load_model(user_id):
-    model_path = "models/" + user_id + "/" + DEFAULT_MODEL_FILE_NAME
+    model_path = "models/" + user_id + "/" + app_config.DEFAULT_MODEL_FILE_NAME
     if (os.path.exists(model_path)):
         print("Das Modell für den User " + user_id + " existiert bereits.")
         model = load_model(model_path)
@@ -64,7 +62,7 @@ def _preprocess_training_data(training_data):
 
     flattened_array = training_data.transpose(1, 0, 2).reshape((4, -1))
     
-    if (ENABLE_DETAILED_LOGGING):
+    if (app_config.ENABLE_DETAILED_LOGGING):
         print("flattened array shape: " + str(flattened_array.shape))
         print("flattened array (herz): " + str(flattened_array[0][:32]))
         print("flattened array (sound): " + str(flattened_array[1][:32]))
@@ -99,7 +97,7 @@ def _preprocess_training_data(training_data):
         X_train.append(x_train_value)
         y_train.append(y_label_value)
 
-        if (ENABLE_DETAILED_LOGGING):
+        if (app_config.ENABLE_DETAILED_LOGGING):
             print("Durchlauf: - picke für X_train Elemente von " + str(i) + " bis " + str(i+30) + "; label index " + str(i+30) + "\n")
             print("x_train_shape: " + str(x_train_value.shape))
             print("y_label: " + str(y_label_value))
@@ -109,7 +107,7 @@ def _preprocess_training_data(training_data):
     X_train = np.array(X_train)
     y_train = np.array(y_train)
 
-    if (ENABLE_DETAILED_LOGGING):
+    if (app_config.ENABLE_DETAILED_LOGGING):
         print("Training input (X_train) shape: " + str(X_train.shape)); 
         print("Training label (y_train) shape: " + str(y_train.shape))
 
@@ -199,60 +197,9 @@ def train_model_with_session_data(training_data, user_id):
         history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
 
     # Save the model
-    model.save("models/" + user_id + "/" + DEFAULT_MODEL_FILE_NAME)
+    model.save("models/" + user_id + "/" + app_config.DEFAULT_MODEL_FILE_NAME)
 
-    if (ENABLE_LOG_TRAINING_RESULTS):
+    if (app_config.ENABLE_LOG_TRAINING_RESULTS):
         _plot_training_history(history)
 
-
-
-
-# Test stuff
-MAKE_PREDICTION = True
-sample_user_id = "456"
-
-if (MAKE_PREDICTION):
-
-    # Beispiel prediction data
-    first_row = [60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80]
-    second_row = [30] * 15 + [32] * 15
-    third_row = [1] * 15 + [3] * 15
-    fourth_row = [1.2] * 15 + [0.8] * 15
-
-    # Gesamter Array
-    session_data_two_time_units_1 = np.array([
-        first_row,
-        second_row,
-        third_row,
-        fourth_row
-    ])
-
-
-    print(session_data_two_time_units_1.shape)
-
-    # Array umformen zu (1, 4, 30)
-    reshaped_array = session_data_two_time_units_1[np.newaxis, :, :]
-    # Das Array in die Form (4, 30) umformen
-    #reshaped_array = session_data_two_time_units_1.reshape(4, 30)
-    #reshaped_array = session_data_two_time_units_1[np.newaxis, :, :]
-
-    #print(reshaped_array)
-
-
-    print(reshaped_array.shape)
-    # Vorhersage
-    prediction = predict_next_heart_rate(reshaped_array, sample_user_id)
-
-    print("hearth rate: " + str(prediction));
-else:
-    # Create sample training data for one meditation session (40 time units)
-    training_data = _get_sample_training_data(num_time_units=40)
-    training_data = np.array(training_data)
-
-
-
-    print("Training data shape: " + str(training_data.shape))
-    #print(str(training_data))
-
-    train_model_with_session_data(training_data, sample_user_id)
 
