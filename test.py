@@ -1,16 +1,16 @@
 import numpy as np
 
-# Annahme: arr ist das ursprüngliche Array mit der Form (555, 4, 45)
-arr = np.random.rand(555, 4, 45)
+# Bestehendes Array mit 30 Werten
+existing_array = np.array([70,65,60,55,50,55,60,65,70, 75, 80, 85, 90])
 
-# Neues Array mit der gewünschten Form erstellen
-new_shape = (arr.shape[0], 3, 4, 15)
-arr_reshaped = arr.reshape(new_shape)
+# Anzahl der zusätzlichen Werte
+additional_values = 15
 
-# Überprüfung der Werte vor und nach der Umformung
-are_equal = np.array_equal(arr.flatten(), arr_reshaped.flatten())
+# Lineare Interpolation
+interp_indices = np.linspace(0, len(existing_array) - 1, additional_values)
+interpolated_values = np.interp(interp_indices, np.arange(len(existing_array)), existing_array)
 
-if are_equal:
-    print("Die Umformung war erfolgreich.")
-else:
-    print("Die Umformung war nicht erfolgreich.")
+# Das vollständige Array
+complete_array = np.concatenate([existing_array, interpolated_values.round().astype(int)])
+
+print(complete_array)

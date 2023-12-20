@@ -43,21 +43,31 @@ def get_sample_session_data():
     reshaped_array = session_data_two_time_units_1[np.newaxis, :, :]
     return reshaped_array
 
-# Make sure the length of heart_rate_arr is 15
+# Make sure the length of heart_rate_arr is 30
 def _get_next_random_config(heart_rate_arr):
 
+    # Add missing values to fit model architecture (15 heart rate values) with linear interpolation
+    additional_values = 15
+    interp_indices = np.linspace(0, len(heart_rate_arr) - 1, additional_values)
+    interpolated_values = np.interp(interp_indices, np.arange(len(heart_rate_arr)), heart_rate_arr)
+    complete_heart_rate_array = interpolated_values.round().astype(int)
+    complete_heart_rate_array = complete_heart_rate_array.tolist()
+
     # create random integer between 0 and 41
-    binaural_hz_random = np.random.randint(0, 41)
+    binaural_hz_random = np.random.randint(1, 41)
     # create random integer between 0 and 6
     visualisation_type_random = np.random.randint(0, 6)
     # create random float between 0.8 and 1.6
-    breathing_multiplier_random = np.random.uniform(0.8, 1.6)
+    breathing_multiplier_choices = np.arange(0.8, 1.7, 0.1)
+    breathing_multiplier_random = np.random.choice(breathing_multiplier_choices)    
 
+    #complete_heart_rate_array = np.random.randint(70, 90
+                    
     config_test = (
-        heart_rate_arr,
-        binaural_hz_random * 15,
-        visualisation_type_random * 15,
-        breathing_multiplier_random * 15
+        complete_heart_rate_array,
+        [binaural_hz_random] * 15,
+        [visualisation_type_random] * 15,
+        [breathing_multiplier_random] * 15
     )
     return np.array(config_test)
 
@@ -74,7 +84,7 @@ def _get_sample_training_data(num_time_units=20):
         heart_rate = np.random.randint(60, 110, size=15)
         sound_in_hz = np.random.randint(30, 41, size=15)
         visualisation_type = np.random.randint(0, 6, size=15)
-        breathing_multiplier = np.random.uniform(0.8, 1.6, size=15)
+        breathing_multiplier = np.linspace(0.8, 1.6, num=15)
 
         training_data.append((heart_rate, sound_in_hz, visualisation_type, breathing_multiplier))
 
@@ -192,9 +202,11 @@ def predict_next_heart_rate(session_data_two_time_units, user_id):
     min_heart_rate = 999 # placeholder for mimumum
     count_tried_combinations = 0
     best_combination = None
+
+    heart_rate_arr = session_data_two_time_units[0]
     while count_tried_combinations < 50:
 
-        heart_rate_arr = session_data_two_time_units[0]
+
         #print("Herzfrequenz Array: " + str(heart_rate_arr) + "\n")
 
         next_possible_combination = _get_next_random_config(heart_rate_arr)
@@ -205,6 +217,8 @@ def predict_next_heart_rate(session_data_two_time_units, user_id):
 
         complete_input_array = np.concatenate((session_data_two_time_units, next_possible_combination), axis=1)
 
+        print("Hz: " + str(next_possible_combination[1][0]) + " - Vis: " + str(next_possible_combination[2][0]) + " - Breath: " + str(next_possible_combination[3][0]) + "\n")
+        #print(str(next_possible_combination) + "\n")
         # Check if the shape is correct (4 x 45) [session data + possible combination]
         assert complete_input_array.shape[0] == 4, "Die Form der kombinierten Daten entspricht nicht den Erwartungen (4 Datensätze)."
         assert complete_input_array.shape[1] == 45, "Die Form der kombinierten Daten entspricht nicht den Erwartungen (45 Time-Series-Merkmale)."
@@ -213,11 +227,10 @@ def predict_next_heart_rate(session_data_two_time_units, user_id):
         complete_input_array = np.expand_dims(complete_input_array, axis=0)
        # print("Shape of complete_input_array: " + str(complete_input_array.shape))
 
-        # Problem: Mit was fülle ich die Lücke der Herzrate auf (15 Werte des letzten Arrays fehlen)
-
         predicted_heart_rate = model.predict(complete_input_array)
 
-        print(str(count_tried_combinations+1) + "/" + str(50) + "Predicted heart rate: " + str(predicted_heart_rate) + " for combination: " + str(next_possible_combination) + "\n")
+        #print(str(count_tried_combinations+1) + "/" + str(50) + " - Predicted heart rate: " + str(predicted_heart_rate) + " for combination: " + str(next_possible_combination) + "\n")
+        print(predicted_heart_rate)
 
         if predicted_heart_rate < min_heart_rate:
             min_heart_rate = predicted_heart_rate

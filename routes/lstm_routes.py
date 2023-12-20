@@ -33,8 +33,13 @@ def predict():
 
     prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units_1, sample_user_id)
 
-    print("hearth rate: " + str(prediction));
-    return jsonify({'message': str(prediction)})
+    print("hearth rate: " + str(prediction))
+
+    return jsonify({'best_combination': {
+        'binauralBeatsInHz': prediction[1][0],
+        'visualization': int(prediction[2][0]),
+        'breathFrequency': prediction[3][0]
+    }})
     
 
 def train_model():
