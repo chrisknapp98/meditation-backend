@@ -7,7 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 
 import lstm.meditation_lstm as meditation_lstm
-from routes.lstm_routes import test, predict, train_model
+from routes.lstm_routes import predict, train_model
 
 #from routes.meditation_routes import get_meditation_sessions, create_meditation_session
 
@@ -29,9 +29,9 @@ app.config['db'] = db
 app.config['app'] = app
 
 # Register lstm routes
-app.add_url_rule('/test', view_func=test, methods=['GET'])
+# TODO Adjust to POST
 app.add_url_rule('/predict', view_func=predict, methods=['GET'])
-app.add_url_rule('/train_model', view_func=train_model, methods=['POST'])
+app.add_url_rule('/train_model', view_func=train_model, methods=['GET'])
 
 # TODO: Register meditation routes
 #app.add_url_rule('/meditations', view_func=get_meditation_sessions, methods=['GET'])
