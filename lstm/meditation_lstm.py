@@ -16,6 +16,9 @@ import app_config as app_config
 import itertools
 from threading import Thread
 from datetime import datetime
+from keras.layers import Input, LSTM, Dense, concatenate
+from keras.models import Model
+
 #from matplotlib import pyplot as plt
 # WARNING:absl:At this time, the v2.11+ optimizer `tf.keras.optimizers.Adam` runs slowly on M1/M2 Macs, please use the legacy Keras optimizer instead, located at `tf.keras.optimizers.legacy.Adam`.
 
@@ -121,7 +124,8 @@ def _preprocess_training_data(training_data):
     # Loop trough flattened array and create new arrays with shape (4, 30)
     #result_X_train = np.array([],[])
 
-    X_train = []
+    X1_train = []
+    X2_train = []
     y_train = []
     for i in range(0, flattened_array.shape[1]):
 
@@ -135,20 +139,37 @@ def _preprocess_training_data(training_data):
             break
         
         # hearth rate as target
-        x_train_value = flattened_array[:, i:i+45]
+        x1_train_value = flattened_array[:, i:i+30]
+        x2_train_value = flattened_array[1:4, i+30:i+45]
         y_label_value = flattened_array[0, i+45]
         
-        X_train.append(x_train_value)
+        #print("x1_train_value: " + str(x1_train_value.shape))
+        #print("x2_train_value: " + str(x2_train_value.shape))
+        #print("y_label_value: " + str(y_label_value.shape))
+
+        #print("\n")
+
+        #print("x1_train_value: " + str(x1_train_value))
+        #print("x2_train_value: " + str(x2_train_value))
+        #print("y_label_value: " + str(y_label_value))
+
+        #print("\n")
+        #print("\n")
+
+        X1_train.append(x1_train_value)
+        X2_train.append(x2_train_value)
         y_train.append(y_label_value)
 
         if (app_config.ENABLE_DETAILED_LOGGING):
-            print("Durchlauf: - picke für X_train Elemente von " + str(i) + " bis " + str(i+45) + "; label index " + str(i+45) + "\n")
-            print("x_train_shape: " + str(x_train_value.shape))
+            print("Durchlauf: - picke für X1_train Elemente von " + str(i) + " bis " + str(i+30) + "; label index " + str(i+45) + "\n")
+            print("x2_train - picke für X2_train Elemente von " + str(i+30) + " bis " + str(i+45))
+
             print("y_label: " + str(y_label_value))
 
 
     # Convert the list to a numpy array
-    X_train = np.array(X_train)
+    X1_train = np.array(X1_train)
+    X2_train = np.array(X2_train)
     y_train = np.array(y_train)
 
     # Current: 55x4x45
@@ -157,22 +178,26 @@ def _preprocess_training_data(training_data):
     #X_train = X_train_temp.reshape(x_train_new_shape)
 
     # Extract the test data
-    X_test = X_train[-100:]
+    X1_test = X1_train[-100:]
+    X2_test = X2_train[-100:]
     y_test = y_train[-100:]
 
     # TODO Remove the test data from the training data, comment in for great results :D
-    X_train = X_train[:-100]
+    X1_train = X1_train[:-100]
+    X2_train = X2_train[:-100]
     y_train = y_train[:-100]
 
     if (app_config.ENABLE_DETAILED_LOGGING):
-        print("Final training input (X_train) shape: " + str(X_train.shape)); 
+        print("Final training input (X1_train) shape: " + str(X1_train.shape)); 
+        print("Final training input (X2_train) shape: " + str(X2_train.shape)); 
         print("Final training label (y_train) shape: " + str(y_train.shape))
-        print("Final test input (X_test) shape: " + str(X_test.shape))
+        print("Final test input (X1_test) shape: " + str(X1_test.shape))
+        print("Final test input (X2_test) shape: " + str(X2_test.shape))
         print("Final test label (y_test) shape: " + str(y_test.shape))
 
     print("Trainings und Testdaten erfolgreich erstellt!")
 
-    return X_train, y_train, X_test, y_test
+    return X1_train, X2_train, y_train, X1_test, X2_test, y_test
 
 
 # Make sure the shape of the session_data is (4x 30)
@@ -251,13 +276,16 @@ def train_model_with_session_data(training_data, user_id):
 
     # Prüfe ob das Modell bereits existiert
     model = _load_model(user_id)
-    X_train, y_train, X_test, y_test = _preprocess_training_data(training_data)
+    X1_train, X2_train, y_train, X1_test, X2_test, y_test = _preprocess_training_data(training_data)
     # müsste dann vom shape batch_sizex3x4x15 sein
 
     # Print all shapes
-    print("X_train shape: " + str(X_train.shape))
+    print("X_train shape: " + str(X1_train.shape))
+    print("X2_train shape: " + str(X2_train.shape))
+
     print("y_train shape: " + str(y_train.shape))
-    print("X_test shape: " + str(X_test.shape))
+    print("X_test shape: " + str(X1_test.shape))
+    print("X2_test shape: " + str(X2_test.shape))
     print("y_test shape: " + str(y_test.shape))
 
     if (model is None):
@@ -266,15 +294,27 @@ def train_model_with_session_data(training_data, user_id):
 
         # LSTM Model, every data point has shape 3x4x15 (input dimensions)
         # = Input -> 4 x 45 (Keras erwartet 3 Dimensionen inkl. Batch-size)
-        model = Sequential()
+        input_last_two_session_units = Input(shape=(4, 30))
+        input_new_proposed_config = Input(shape=(3, 15))
 
-        model.add(InputLayer(input_shape=(4, 45)))
-        model.add(LSTM(64))
-        model.add(Dense(8, activation='relu'))
-        model.add(Dense(1, activation='linear'))
+        # Create lstm with two inputs
+        shared_lstm = LSTM(64)
+        x1 = shared_lstm(input_last_two_session_units)
+        x2 = shared_lstm(input_new_proposed_config)
+
+        merged = concatenate([x1, x2], axis=-1)
+
+        x = Dense(8, activation='relu')(merged)
+        output = Dense(1, activation='linear')(x)
+
+        # Erstellung des Modells
+        model = Model(inputs=[x1, x2], outputs=output)
         model.summary()
         model.compile(loss='mae', optimizer='adam')
-        history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
+
+        #history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
+        history = model.fit([X1_train, X2_train], y_train, epochs=50, batch_size=32, validation_data=([X1_test, X2_test], y_test), verbose=2, shuffle=False)
+
 
         # Erstelle das Verzeichnis, wenn es nicht existiert
         model_directory = "models/" + user_id
