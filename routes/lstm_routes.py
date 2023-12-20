@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 import numpy as np
 import lstm.meditation_lstm as meditation_lstm
 
-def test(request):
+def test():
         # Test stuff
     MAKE_PREDICTION = True
     sample_user_id = "456"
@@ -41,7 +41,7 @@ def test(request):
         prediction = meditation_lstm.predict_next_heart_rate(reshaped_array, sample_user_id)
 
         print("hearth rate: " + str(prediction));
-        return jsonify({'message': 'Hello World!'})
+        return jsonify({'message': str(prediction)})
     else:
         # Create sample training data for one meditation session (40 time units)
         training_data = meditation_lstm._get_sample_training_data(num_time_units=40)
@@ -56,21 +56,26 @@ def test(request):
         return jsonify({'message': 'Hello World!'})
     
 
-def predict(request):
+def predict():
     # Preprocessing missing values
     # Länge der 4 Datenarrays -> 30 Werte pro Array
     # Validierung der Werte der 4 Datenarrays -> 60-120, 30-40, 0-5, 0.8-1.6 (?)
     # Ggf. fehlende Werte einfügen
 
+    # LSTM Input is 1, 4, 30
 
     # Parse JSON data from the request body
-    data = request.json
+   # data = request.json
 
+    sample_session_data = meditation_lstm.get_sample_session_data()
+    meditation_lstm.predict_next_heart_rate(sample_session_data, "123")
+    
     # Your model prediction logic here
     result = {"prediction": "some_result"}
 
     # Return the result as JSON
     return jsonify(result)
 
-def train_model(request):
+def train_model():
+    # Training 20 x 4 x 15
     print("hello")

@@ -8,6 +8,7 @@ from tensorflow.keras.metrics import RootMeanSquaredError
 from tensorflow.keras.optimizers import Adam
 from keras.models import load_model
 import app_config as app_config
+import itertools
 
 from matplotlib import pyplot
 # WARNING:absl:At this time, the v2.11+ optimizer `tf.keras.optimizers.Adam` runs slowly on M1/M2 Macs, please use the legacy Keras optimizer instead, located at `tf.keras.optimizers.legacy.Adam`.
@@ -18,10 +19,32 @@ from matplotlib import pyplot
 
 # Constants
 
+# Returns input data of shape (1x4x30)
+def get_sample_session_data():
+    first_row = [60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80]
+    second_row = [30] * 15 + [32] * 15
+    third_row = [1] * 15 + [3] * 15
+    fourth_row = [1.2] * 15 + [0.8] * 15
 
-#def _get_next_random_config():
-#    config_test = np.random.randint(70, 130, size=15), np.random.randint(30, 41, size=15), np.random.randint(0, 6, size=15), np.random.uniform(0.8, 1.6, size=15)
-#    return config_test
+    session_data_two_time_units_1 = np.array([
+        first_row,
+        second_row,
+        third_row,
+        fourth_row
+    ])
+
+    # Array umformen zu (1, 4, 30)
+    reshaped_array = session_data_two_time_units_1[np.newaxis, :, :]
+    return reshaped_array
+
+def _get_next_random_config():
+    config_test = (
+        np.random.randint(70, 130, size=15),
+        np.random.randint(30, 41, size=15),
+        np.random.randint(0, 6, size=15),
+        np.random.uniform(0.8, 1.6, size=15)
+    )
+    return np.expand_dims(np.stack(config_test, axis=-1), axis=0).transpose((0, 2, 1))
 
 # Create sample training data
 # 4 arrays of time series data (heart rate, sound in hz, visualisation type, breathing multiplier)
@@ -129,6 +152,7 @@ def _plot_training_history(history):
     pyplot.legend()
     pyplot.show()
 
+# Make sure the shape of the session_data is (1 x 4 x 30)
 def predict_next_heart_rate(session_data_two_time_units, user_id):
     model = _load_model(user_id)
     if (model is None):
@@ -140,9 +164,52 @@ def predict_next_heart_rate(session_data_two_time_units, user_id):
     assert session_data_two_time_units.shape[1] == 4, "Die Form der Daten entspricht nicht den Erwartungen (4 Datensätze)."
     assert session_data_two_time_units.shape[2] == 30, "Die Form der Daten entspricht nicht den Erwartungen (30 Time-Series-Merkmale)."
 
-    # Make prediction
-    prediction = model.predict(session_data_two_time_units)
-    print("Prediction für User " + user_id + " - " + str(prediction) + " (heart rate))")
+    # 
+    # Annahme: input_arrays_1, input_arrays_2, input_arrays_3 sind deine Arrays
+
+    min_heart_rate = 999 # placeholder for mimumum
+    count_tried_combinations = 0
+    while count_tried_combinations < 50:
+
+        next_possible_combination = _get_next_random_config()
+
+        # print shape of two arrays
+        print("Shape of session_data_two_time_units: " + str(session_data_two_time_units.shape))
+        print("Shape of next_possible_combination: " + str(next_possible_combination.shape))
+
+        complete_input_array = np.concatenate((session_data_two_time_units, next_possible_combination), axis=2)
+
+        # Check if the shape is correct (1 x 4 x 45) [session data + possible combination]
+        assert complete_input_array.shape[0] == 1, "Die Form der kombinierten Daten entspricht nicht den Erwartungen (1 Datensätze)."
+        assert complete_input_array.shape[1] == 4, "Die Form der kombinierten Daten entspricht nicht den Erwartungen (4 Datensätze)."
+        assert complete_input_array.shape[2] == 45, "Die Form der kombinierten Daten entspricht nicht den Erwartungen (45 Time-Series-Merkmale)."
+
+        prediction = model.predict(complete_input_array)
+
+        prediction = model.predict(session_data_two_time_units)
+        return prediction
+        exit()
+        # Placeholder für das Minimum
+        best_combination = None
+
+        # Durchlaufe alle Kombinationen
+        for combination in all_combinations:
+            # Hier führst du dein Modelltraining und die Vorhersagen durch
+            # Implementiere die Logik, um die Herzfrequenz zu erhalten
+            heart_rate = train_and_predict(combination)
+
+            # Wenn die aktuelle Kombination eine niedrigere Herzfrequenz hat, aktualisiere das Minimum
+            if heart_rate < min_heart_rate:
+                min_heart_rate = heart_rate
+                best_combination = combination
+
+        # Der beste Satz von Input-Arrays
+        print("Beste Kombination:", best_combination)
+        print("Minimale Herzfrequenz:", min_heart_rate)
+
+        # Make prediction
+        prediction = model.predict(session_data_two_time_units)
+        print("Prediction für User " + user_id + " - " + str(prediction) + " (heart rate))")
 
     return prediction
 
@@ -166,6 +233,7 @@ def train_model_with_session_data(training_data, user_id):
     # Prüfe ob das Modell bereits existiert
     model = _load_model(user_id)
     X_train, y_train, X_test, y_test = _preprocess_training_data(training_data)
+    # müsste dann vom shape batch_sizex3x4x15 sein
 
     # Print all shapes
     print("X_train shape: " + str(X_train.shape))
@@ -177,15 +245,16 @@ def train_model_with_session_data(training_data, user_id):
         # User has no model yet -> create a new one
         print("User hat noch kein Modell -> erstelle ein neues Modell")
 
-        # LSTM Model, every data point has shape 4x15 (input dimensions)
+        # LSTM Model, every data point has shape 3x4x15 (input dimensions)
         model = Sequential()
 
-        model.add(InputLayer(input_shape=(4, 30)))
+        model.add(InputLayer(input_shape=(3, 4, 15)))
         model.add(LSTM(64))
         model.add(Dense(8, activation='relu'))
         model.add(Dense(1, activation='linear'))
         model.summary()
         model.compile(loss='mae', optimizer='adam')
+        # TODO Batch size anpassen
         history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
 
         # Erstelle das Verzeichnis, wenn es nicht existiert

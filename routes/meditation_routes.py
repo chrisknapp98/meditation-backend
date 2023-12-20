@@ -1,8 +1,9 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from flask import current_app, request, jsonify
 
-def get_meditation_sessions(db, request):
+def get_meditation_sessions():
     try:
         # Get device_id from query parameters
         device_id = request.args.get('deviceId')
@@ -32,7 +33,9 @@ def get_meditation_sessions(db, request):
 
 
 
-def create_meditation_session(db, request):
+def create_meditation_session():
+    db = current_app.config['db']
+
     # Validate the request body
     data = request.get_json()
     if not data:
