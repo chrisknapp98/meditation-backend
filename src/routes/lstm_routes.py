@@ -1,8 +1,11 @@
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
+from flask import request, jsonify, Blueprint
 import numpy as np
 import lstm.meditation_lstm as meditation_lstm
 
+lstm_routes = Blueprint('lstm_routes', __name__)
+
+
+@lstm_routes.route("/predict", methods=['POST'])
 def predict():
     print("Request on /predict received.")
     request_data = request.json
@@ -23,8 +26,8 @@ def predict():
     print("Length of visualization_arr: " + str(len(visualization_arr)))
     print("Length of breath_multiplier_arr: " + str(len(breath_multiplier_arr)))
 
-
-    session_data_two_time_units = np.array([heart_rate_arr, binaural_beats_arr, visualization_arr, breath_multiplier_arr])
+    session_data_two_time_units = np.array(
+        [heart_rate_arr, binaural_beats_arr, visualization_arr, breath_multiplier_arr])
 
     prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units, user_id)
 
@@ -34,6 +37,8 @@ def predict():
         'breathFrequency': prediction[3][0]
     }})
 
+
+@lstm_routes.route("/train_model", methods=['POST'])
 def train_model():
     request_data = request.json
 

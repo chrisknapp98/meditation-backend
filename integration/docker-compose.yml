@@ -27,6 +27,9 @@ services:
       - .env
     environment:
       DATABASE_HOST: db
+      MODEL_SAVE_PATH: /app/models
+    volumes:
+      - ${MODEL_PATH}:/app/models
     healthcheck:
       test:
         [

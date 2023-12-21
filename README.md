@@ -15,6 +15,8 @@ and flask server.
 
 `docker compose up -d --wait`
 
+To view the logs from the rest-server container, the command `docker logs rest-server` can be used.
+
 ## stop containers
 
 `docker compose down`

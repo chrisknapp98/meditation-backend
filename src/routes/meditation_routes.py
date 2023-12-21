@@ -1,13 +1,19 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Blueprint
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from flask import current_app, request, jsonify
 
+from models import MeditationSession, SessionPeriod
+
+meditation_routes = Blueprint('meditation_routes', __name__)
+
+
+@meditation_routes.route("/meditations", methods=['GET'])
 def get_meditation_sessions():
     try:
         # Get device_id from query parameters
         device_id = request.args.get('deviceId')
-        
+
         # Use joinedload to eager load the related SessionMeta
         query = MeditationSession.query
 
@@ -32,7 +38,7 @@ def get_meditation_sessions():
         return jsonify({'error': 'Internal Server Error'}), 500
 
 
-
+@meditation_routes.route("/meditations", methods=['POST'])
 def create_meditation_session():
     db = current_app.config['db']
 
@@ -43,24 +49,24 @@ def create_meditation_session():
 
     # Validate required fields in the request body
     required_fields = [
-        'deviceId', 
-        'date', 
-        'duration', 
-        'isCompleted', 
-        'isCanceled', 
+        'deviceId',
+        'date',
+        'duration',
+        'isCompleted',
+        'isCanceled',
         'sessionPeriods',
     ]
     for field in required_fields:
         if field not in data:
             return jsonify({'error': f'Missing required field: {field}'}), 400
-    
+
     required_fields_in_session_periods = [
         'heartRateMeasurements',
         'visualization',
         'beatFrequency',
-        'breathingPattern', 
-        'breathingPatternMultiplier', 
-        'isHapticFeedbackEnabled', 
+        'breathingPattern',
+        'breathingPatternMultiplier',
+        'isHapticFeedbackEnabled',
     ]
     for index, period in enumerate(data['sessionPeriods']):
         for field in required_fields_in_session_periods:
@@ -93,46 +99,3 @@ def create_meditation_session():
     return jsonify({'message': 'Meditation session created successfully'}), 201
 
 
-class MeditationSession(db.Model):
-    __tablename__ = 'meditation_sessions'
-    id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.String(36), nullable=False)
-    date = db.Column(db.DateTime, nullable=False)
-    duration = db.Column(db.Integer, nullable=False)
-    is_completed = db.Column(db.Boolean, nullable=False, default=False)
-    is_canceled = db.Column(db.Boolean, nullable=False, default=False)
-    session_periods = db.relationship('SessionPeriod', back_populates='meditation_session', cascade='all, delete-orphan')
-
-    def to_dict(self):
-        return {
-            'deviceId': self.device_id,
-            'date': self.date.isoformat() if self.date else None,
-            'duration': self.duration,
-            'isCompleted': self.is_completed,
-            'isCanceled': self.is_canceled,
-            'sessionPeriods': [period.to_dict() for period in self.session_periods]
-        }
-
-
-class SessionPeriod(db.Model):
-    __tablename__ = 'session_periods'
-    id = db.Column(db.Integer, primary_key=True)
-    meditation_session_id = db.Column(db.Integer, db.ForeignKey('meditation_sessions.id', ondelete='CASCADE'), nullable=False)
-    heart_rate_measurements = db.Column(db.JSON, nullable=False)
-    visualization = db.Column(db.String(255), nullable=True)
-    beat_frequency = db.Column(db.Float, nullable=True)
-    breathing_pattern = db.Column(db.JSON, nullable=False)
-    breathing_pattern_multiplier = db.Column(db.Float, nullable=False)
-    is_haptic_feedback_enabled = db.Column(db.Boolean, nullable=False)
-
-    meditation_session = db.relationship('MeditationSession', back_populates='session_periods')
-
-    def to_dict(self):
-        return {
-            'heartRateMeasurements': self.heart_rate_measurements,
-            'visualization': self.visualization,
-            'beatFrequency': self.beat_frequency,
-            'breathingPattern': self.breathing_pattern,
-            'breathingPatternMultiplier': self.breathing_pattern_multiplier,
-            'isHapticFeedbackEnabled': self.is_haptic_feedback_enabled
-        }

@@ -1,7 +1,7 @@
 import numpy as np
 
 # Bestehendes Array mit 30 Werten
-existing_array = np.array([70,65,60,55,50,55,60,65,70, 75, 80, 85, 90])
+existing_array = np.array([70, 65, 60, 55, 50, 55, 60, 65, 70, 75, 80, 85, 90])
 
 # Anzahl der zusätzlichen Werte
 additional_values = 15
