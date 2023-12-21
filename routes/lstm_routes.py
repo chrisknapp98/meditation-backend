@@ -3,53 +3,52 @@ from flask_sqlalchemy import SQLAlchemy
 import numpy as np
 import lstm.meditation_lstm as meditation_lstm
 
-
-   
-
 def predict():
-    # Preprocessing missing values
-    # Länge der 4 Datenarrays -> 30 Werte pro Array
-    # Validierung der Werte der 4 Datenarrays -> 60-120, 30-40, 0-5, 0.8-1.6 (?)
-    # Ggf. fehlende Werte einfügen
+    print("Request on /predict received.")
+    request_data = request.json
 
-    # Beispiel prediction data
-    first_row = [60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80]
-    second_row = [30] * 15 + [32] * 15
-    third_row = [1] * 15 + [3] * 15
-    fourth_row = [1.2] * 15 + [0.8] * 15
+    required_fields = ['heart_rate_arr', 'binaural_beats_arr', 'visualization_arr', 'breath_multiplier_arr', 'user_id']
+    if not all(field in request_data for field in required_fields):
+        return jsonify({'error': 'Missing required fields in the request.'}), 400
 
-    # Gesamter Array
-    session_data_two_time_units_1 = np.array([
-            first_row,
-            second_row,
-            third_row,
-            fourth_row
-    ])
-    sample_user_id = "123"
+    heart_rate_arr = request_data['heart_rate_arr']
+    binaural_beats_arr = request_data['binaural_beats_arr']
+    visualization_arr = request_data['visualization_arr']
+    breath_multiplier_arr = request_data['breath_multiplier_arr']
+    user_id = request_data['user_id']
 
-    # TODO get data from request object
+    # print length of each array
+    print("Length of heart_rate_arr: " + str(len(heart_rate_arr)))
+    print("Length of binaural_beats_arr: " + str(len(binaural_beats_arr)))
+    print("Length of visualization_arr: " + str(len(visualization_arr)))
+    print("Length of breath_multiplier_arr: " + str(len(breath_multiplier_arr)))
 
-    print(session_data_two_time_units_1.shape)
 
-    prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units_1, sample_user_id)
+    session_data_two_time_units = np.array([heart_rate_arr, binaural_beats_arr, visualization_arr, breath_multiplier_arr])
 
-    print("hearth rate: " + str(prediction))
+    prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units, user_id)
 
     return jsonify({'best_combination': {
         'binauralBeatsInHz': prediction[1][0],
         'visualization': int(prediction[2][0]),
         'breathFrequency': prediction[3][0]
     }})
-    
 
 def train_model():
-    # Create sample training data for one meditation session (40 time units)
-    training_data = meditation_lstm._get_sample_training_data(num_time_units=40)
-    sample_user_id = "123"
-    # TODO get data from request object
+    request_data = request.json
 
-    training_data = np.array(training_data)
-    print("Training data shape: " + str(training_data.shape))
+    required_fields = ['user_id', 'training_data']
+    if not all(field in request_data for field in required_fields):
+        return jsonify({'error': 'Missing required fields in the request.'}), 400
 
-    meditation_lstm.train_model_with_session_data(training_data, sample_user_id)
-    return jsonify({'message': 'Modell für User ' + sample_user_id + ' trainiert.'})
+    training_data_arr = request_data['training_data']
+    print("Length of training_data_arr: " + str(len(training_data_arr)))
+
+    training_data = np.array(training_data_arr)
+
+    print("Shape of training_data_arr: " + str(np.shape(training_data)))
+    user_id = request_data['user_id']
+
+    meditation_lstm.train_model_with_session_data(training_data, user_id)
+
+    return jsonify({'message': 'Modell für User ' + user_id + ' erfolgreich trainiert.'})

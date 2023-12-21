@@ -25,23 +25,19 @@ from datetime import datetime
 
 # Constants
 
-# Returns input data of shape (1x4x30)
-def get_sample_session_data():
-    first_row = [60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80, 60, 65, 70, 75, 80]
-    second_row = [30] * 15 + [32] * 15
-    third_row = [1] * 15 + [3] * 15
-    fourth_row = [1.2] * 15 + [0.8] * 15
+# Returns input data of shape (40x4x15)
+def get_sample_session_data(num_time_units=40):
+    session_data = []
 
-    session_data_two_time_units_1 = np.array([
-        first_row,
-        second_row,
-        third_row,
-        fourth_row
-    ])
+    for _ in range(num_time_units):
+        heart_rate = np.random.randint(60, 81, size=15)
+        binaural_beats = np.random.randint(30, 41, size=15)
+        visualization = np.random.randint(0, 6, size=15)
+        breath_multiplier = np.random.uniform(0.8, 1.6, size=15)
 
-    # Array umformen zu (1, 4, 30)
-    reshaped_array = session_data_two_time_units_1[np.newaxis, :, :]
-    return reshaped_array
+        session_data.append([heart_rate, binaural_beats, visualization, breath_multiplier])
+
+    return np.array(session_data)
 
 # Make sure the length of heart_rate_arr is 30
 def _get_next_random_config(heart_rate_arr):
@@ -76,19 +72,7 @@ def _get_next_random_config(heart_rate_arr):
 # 15 values per array
 # 40 = 20 time units (2 seconds each) (20 min meditation)
 # returns training data with shape (40, 4, 15)
-def _get_sample_training_data(num_time_units=20):
-    training_data = []
 
-    # Create two sample data session arrays
-    for _ in range(num_time_units):
-        heart_rate = np.random.randint(60, 110, size=15)
-        sound_in_hz = np.random.randint(30, 41, size=15)
-        visualisation_type = np.random.randint(0, 6, size=15)
-        breathing_multiplier = np.linspace(0.8, 1.6, num=15)
-
-        training_data.append((heart_rate, sound_in_hz, visualisation_type, breathing_multiplier))
-
-    return np.array(training_data)
 
 def _load_model(user_id):
     model_path = "models/" + user_id + "/" + app_config.DEFAULT_MODEL_FILE_NAME
@@ -204,7 +188,7 @@ def predict_next_heart_rate(session_data_two_time_units, user_id):
     best_combination = None
 
     heart_rate_arr = session_data_two_time_units[0]
-    while count_tried_combinations < 50:
+    while count_tried_combinations < 100:
 
 
         #print("Herzfrequenz Array: " + str(heart_rate_arr) + "\n")
@@ -217,7 +201,7 @@ def predict_next_heart_rate(session_data_two_time_units, user_id):
 
         complete_input_array = np.concatenate((session_data_two_time_units, next_possible_combination), axis=1)
 
-        print("Hz: " + str(next_possible_combination[1][0]) + " - Vis: " + str(next_possible_combination[2][0]) + " - Breath: " + str(next_possible_combination[3][0]) + "\n")
+        #print("Hz: " + str(next_possible_combination[1][0]) + " - Vis: " + str(next_possible_combination[2][0]) + " - Breath: " + str(next_possible_combination[3][0]) + "\n")
         #print(str(next_possible_combination) + "\n")
         # Check if the shape is correct (4 x 45) [session data + possible combination]
         assert complete_input_array.shape[0] == 4, "Die Form der kombinierten Daten entspricht nicht den Erwartungen (4 Datensätze)."

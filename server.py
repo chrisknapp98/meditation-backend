@@ -30,8 +30,8 @@ app.config['app'] = app
 
 # Register lstm routes
 # TODO Adjust to POST
-app.add_url_rule('/predict', view_func=predict, methods=['GET'])
-app.add_url_rule('/train_model', view_func=train_model, methods=['GET'])
+app.add_url_rule('/predict', view_func=predict, methods=['POST'])
+app.add_url_rule('/train_model', view_func=train_model, methods=['POST'])
 
 # TODO: Register meditation routes
 #app.add_url_rule('/meditations', view_func=get_meditation_sessions, methods=['GET'])
