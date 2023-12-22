@@ -1,0 +1,6 @@
+
+Virtuelle Umgebung erstellen:
+python3 -m venv venv
+
+Virtuelle Umgebung aktivieren:
+source venv/bin/activate
