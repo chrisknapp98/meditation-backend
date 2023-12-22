@@ -37,7 +37,6 @@ services:
           "curl",
           "http://127.0.0.1:${SERVER_PORT}/meditations"
         ]
-      interval: 2s
       timeout: 2s
       retries: 10
 
