@@ -1,10 +1,9 @@
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
-import random
 import numpy as np
 import os
+from datetime import datetime
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import *
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -13,33 +12,93 @@ from tensorflow.keras.metrics import RootMeanSquaredError
 from tensorflow.keras.optimizers import Adam
 from keras.models import load_model
 import app_config as app_config
-import itertools
-from threading import Thread
-from datetime import datetime
-#from matplotlib import pyplot as plt
-# WARNING:absl:At this time, the v2.11+ optimizer `tf.keras.optimizers.Adam` runs slowly on M1/M2 Macs, please use the legacy Keras optimizer instead, located at `tf.keras.optimizers.legacy.Adam`.
 
-# We make the prediction based on 4 different arrays of time series data: hearth_rate, sound_in_hz, visualisation_type, breathing multiplier
-# These arrays represent the current meditation state from the flutter app and are sent to the server
-# One element in an array represents two seconds of meditation
 
-# Constants
+# Predict the next heart rate for a given user based on the last two time units of the session.
+def predict_next_heart_rate(session_data_two_time_units, user_id):
+    model = _load_model(user_id)
+    if (model is None):
+        print("Fehler. User hat noch garkein Modell.")
+        return None
 
-# Returns input data of shape (40x4x15)
-def get_sample_session_data(num_time_units=40):
-    session_data = []
+    assert session_data_two_time_units.shape[0] == 4, "Die Form der Daten entspricht nicht den Erwartungen (4 Datensätze)."
+    assert session_data_two_time_units.shape[1] == 30, "Die Form der Daten entspricht nicht den Erwartungen (30 Time-Series-Merkmale)."
 
-    for _ in range(num_time_units):
-        heart_rate = np.random.randint(60, 81, size=15)
-        binaural_beats = np.random.randint(30, 41, size=15)
-        visualization = np.random.randint(0, 6, size=15)
-        breath_multiplier = np.random.uniform(0.8, 1.6, size=15)
+    min_heart_rate = 999 # placeholder for mimumum
+    count_tried_combinations = 0
+    best_combination = None
 
-        session_data.append([heart_rate, binaural_beats, visualization, breath_multiplier])
+    heart_rate_arr = session_data_two_time_units[0]
+    while count_tried_combinations < 100:
 
-    return np.array(session_data)
+        next_possible_combination = _get_next_random_config(heart_rate_arr)
+        complete_input_array = np.concatenate((session_data_two_time_units, next_possible_combination), axis=1)
 
-# Make sure the length of heart_rate_arr is 30
+        assert complete_input_array.shape[0] == 4, "Die Form der kombinierten Daten entspricht nicht den Erwartungen (4 Datensätze)."
+        assert complete_input_array.shape[1] == 45, "Die Form der kombinierten Daten entspricht nicht den Erwartungen (45 Time-Series-Merkmale)."
+
+        # Add dimension for correct shape (1 x 4 x 45) (batch size x features x time steps)
+        complete_input_array = np.expand_dims(complete_input_array, axis=0)
+
+        predicted_heart_rate = model.predict(complete_input_array)
+
+        if predicted_heart_rate < min_heart_rate:
+            min_heart_rate = predicted_heart_rate
+            best_combination = next_possible_combination
+
+        count_tried_combinations += 1
+
+    print("Ergebnis - Beste Kombination:" + str(best_combination))
+    print("Ergebnis - Minimale Herzfrequenz:" + str(min_heart_rate))
+
+    return best_combination
+
+# Train the model with the given training data and user_id.
+# Make sure the shape of the training data is (40 x 4 x 15)
+def train_model_with_session_data(training_data, user_id):
+
+    BATCH_SIZE = 40
+    NUMBER_OF_TIME_SERIES_TYPES = 4
+    TIME_SERIES_LENGTH = 15
+
+    assert training_data.shape[0] == BATCH_SIZE, "Die Form der Daten entspricht nicht den Erwartungen (40 Datensätze)."
+    assert training_data.shape[1] == NUMBER_OF_TIME_SERIES_TYPES, "Die Form der Daten entspricht nicht den Erwartungen (4 Time-Series-Merkmale)."
+    assert training_data.shape[2] == TIME_SERIES_LENGTH, "Die Form der Daten entspricht nicht den Erwartungen (15 Zeitschritte)."
+    
+    model = _load_model(user_id)
+    X_train, y_train, X_test, y_test = _preprocess_training_data(training_data)
+
+    if (app_config.ENABLE_DETAILED_LOGGING):
+        print("Validierung der Trainingsdaten erfolgreich!")
+        print("X_train shape: " + str(X_train.shape))
+        print("y_train shape: " + str(y_train.shape))
+        print("X_test shape: " + str(X_test.shape))
+        print("y_test shape: " + str(y_test.shape))
+
+    if (model is None):
+        print("User hat noch kein Modell -> erstelle ein neues Modell")
+
+        model = Sequential()
+        model.add(InputLayer(input_shape=(4, 45)))
+        model.add(LSTM(64))
+        model.add(Dense(8, activation='relu'))
+        model.add(Dense(1, activation='linear'))
+        model.summary()
+        model.compile(loss='mae', optimizer='adam')
+        history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
+
+        model_directory = "models/" + user_id
+        os.makedirs(model_directory, exist_ok=True)
+    else:
+        print("User hat bereits ein Modell -> lade es und trainiere nach")
+        history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
+
+    model.save("models/" + user_id + "/" + app_config.DEFAULT_MODEL_FILE_NAME)
+
+    if (app_config.ENABLE_LOG_TRAINING_RESULTS):
+        _plot_history_to_file(history, user_id)
+
+# Get random session configuration for the next time unit.
 def _get_next_random_config(heart_rate_arr):
 
     # Add missing values to fit model architecture (15 heart rate values) with linear interpolation
@@ -49,15 +108,10 @@ def _get_next_random_config(heart_rate_arr):
     complete_heart_rate_array = interpolated_values.round().astype(int)
     complete_heart_rate_array = complete_heart_rate_array.tolist()
 
-    # create random integer between 0 and 41
     binaural_hz_random = np.random.randint(1, 41)
-    # create random integer between 0 and 6
     visualisation_type_random = np.random.randint(0, 6)
-    # create random float between 0.8 and 1.6
     breathing_multiplier_choices = np.arange(0.8, 1.7, 0.1)
     breathing_multiplier_random = np.random.choice(breathing_multiplier_choices)    
-
-    #complete_heart_rate_array = np.random.randint(70, 90
                     
     config_test = (
         complete_heart_rate_array,
@@ -66,12 +120,6 @@ def _get_next_random_config(heart_rate_arr):
         [breathing_multiplier_random] * 15
     )
     return np.array(config_test)
-
-# Create sample training data
-# 4 arrays of time series data (heart rate, sound in hz, visualisation type, breathing multiplier)
-# 15 values per array
-# 40 = 20 time units (2 seconds each) (20 min meditation)
-# returns training data with shape (40, 4, 15)
 
 
 def _load_model(user_id):
@@ -84,20 +132,14 @@ def _load_model(user_id):
         print("Das Modell für den User " + user_id + " existiert nicht.")
         return None
     
-# Input: (40 x 4 x 15)
-# Output:
-# x_train - 455 x 4 x 45
-# x_test - 100 x x 4 x 45
-# y_train - 455 x 1
-# y_test - 100 x 1
+# Preprocess the training data into the right format for the LSTM model using the sliding window approach
+# Shapes:
+# Input: training_data = (40 x 4 x 15)
+# Output: x_train = 455 x 4 x 45 // x_test = 100 x 4 x 45 // y_train = 455 x 1 // y_test = 100 x 1
 def _preprocess_training_data(training_data):
 
     # Convert the arrays into the right data format dividing into features and target
     # The features are the 4 arrays of time series data and the target is the next heart rate
-    
-    # Shape (40 x 4 x 15) -> create training data in the right format preprocssing (flattened)
-    # -> flattened shape 4 x 600
-
     flattened_array = training_data.transpose(1, 0, 2).reshape((4, -1))
     
     if (app_config.ENABLE_DETAILED_LOGGING):
@@ -109,18 +151,11 @@ def _preprocess_training_data(training_data):
         print("------")
 
 
-
-    # Create training data in the right format with shape (?x)4x30 (X_train)
-    # y_train 1 value (heart rate)
+    # Create training data in the right format with shape 455x4x45 (X_train)
     # Loop trough flattened array and create new arrays with shape (4, 30)
-    #result_X_train = np.array([],[])
-
     X_train = []
     y_train = []
     for i in range(0, flattened_array.shape[1]):
-
-        #print(flattened_array.shape)
-        #print(flattened_array)
 
         print("i: " + str(i))
         print(flattened_array.shape[1])
@@ -140,21 +175,13 @@ def _preprocess_training_data(training_data):
             print("x_train_shape: " + str(x_train_value.shape))
             print("y_label: " + str(y_label_value))
 
-
-    # Convert the list to a numpy array
     X_train = np.array(X_train)
     y_train = np.array(y_train)
 
-    # Current: 55x4x45
-    # Convert into output format (? x 3 x 4 x 15)
-    #x_train_new_shape = (X_train_temp.shape[0], 3, 4, 15)
-    #X_train = X_train_temp.reshape(x_train_new_shape)
-
-    # Extract the test data
     X_test = X_train[-100:]
     y_test = y_train[-100:]
 
-    # TODO Remove the test data from the training data, comment in for great results :D
+    # Remove the test data from the training data, (comment out for great results :D)
     X_train = X_train[:-100]
     y_train = y_train[:-100]
 
@@ -169,126 +196,7 @@ def _preprocess_training_data(training_data):
     return X_train, y_train, X_test, y_test
 
 
-# Make sure the shape of the session_data is (4x 30)
-def predict_next_heart_rate(session_data_two_time_units, user_id):
-    model = _load_model(user_id)
-    if (model is None):
-        print("Fehler. User hat noch garkein Modell.")
-        return None
-
-    # Make sure the input data is equivalent to the time series length
-    assert session_data_two_time_units.shape[0] == 4, "Die Form der Daten entspricht nicht den Erwartungen (4 Datensätze)."
-    assert session_data_two_time_units.shape[1] == 30, "Die Form der Daten entspricht nicht den Erwartungen (30 Time-Series-Merkmale)."
-
-    # 
-    # Annahme: input_arrays_1, input_arrays_2, input_arrays_3 sind deine Arrays
-
-    min_heart_rate = 999 # placeholder for mimumum
-    count_tried_combinations = 0
-    best_combination = None
-
-    heart_rate_arr = session_data_two_time_units[0]
-    while count_tried_combinations < 100:
-
-
-        #print("Herzfrequenz Array: " + str(heart_rate_arr) + "\n")
-
-        next_possible_combination = _get_next_random_config(heart_rate_arr)
-
-        # print shape of two arrays
-        #print("Shape of session_data_two_time_units: " + str(session_data_two_time_units.shape))
-        #print("Shape of next_possible_combination: " + str(next_possible_combination.shape))
-
-        complete_input_array = np.concatenate((session_data_two_time_units, next_possible_combination), axis=1)
-
-        #print("Hz: " + str(next_possible_combination[1][0]) + " - Vis: " + str(next_possible_combination[2][0]) + " - Breath: " + str(next_possible_combination[3][0]) + "\n")
-        #print(str(next_possible_combination) + "\n")
-        # Check if the shape is correct (4 x 45) [session data + possible combination]
-        assert complete_input_array.shape[0] == 4, "Die Form der kombinierten Daten entspricht nicht den Erwartungen (4 Datensätze)."
-        assert complete_input_array.shape[1] == 45, "Die Form der kombinierten Daten entspricht nicht den Erwartungen (45 Time-Series-Merkmale)."
-
-        # Add dimension for correct shape (1 x 4 x 45) (batch size x features x time steps)
-        complete_input_array = np.expand_dims(complete_input_array, axis=0)
-       # print("Shape of complete_input_array: " + str(complete_input_array.shape))
-
-        predicted_heart_rate = model.predict(complete_input_array)
-
-        #print(str(count_tried_combinations+1) + "/" + str(50) + " - Predicted heart rate: " + str(predicted_heart_rate) + " for combination: " + str(next_possible_combination) + "\n")
-        print(predicted_heart_rate)
-
-        if predicted_heart_rate < min_heart_rate:
-            min_heart_rate = predicted_heart_rate
-            best_combination = next_possible_combination
-
-        count_tried_combinations += 1
-
-    # Der beste Satz von Input-Arrays
-    print("Ergebnis - Beste Kombination:" + str(best_combination))
-    print("Ergebnis - Minimale Herzfrequenz:" + str(min_heart_rate))
-
-    return best_combination
-
-# Make sure the shape of the training data is (40 x 4 x 15)
-def train_model_with_session_data(training_data, user_id):
-
-    # Define constants
-    BATCH_SIZE = 40
-    NUMBER_OF_TIME_SERIES_TYPES = 4
-    TIME_SERIES_LENGTH = 15
-
-    # Make sure the input data is equivalent to the time series length
-    assert training_data.shape[0] == BATCH_SIZE, "Die Form der Daten entspricht nicht den Erwartungen (40 Datensätze)."
-    assert training_data.shape[1] == NUMBER_OF_TIME_SERIES_TYPES, "Die Form der Daten entspricht nicht den Erwartungen (4 Time-Series-Merkmale)."
-    assert training_data.shape[2] == TIME_SERIES_LENGTH, "Die Form der Daten entspricht nicht den Erwartungen (15 Zeitschritte)."
-
-    # // TODO Validierungen?
-
-    print("Validierung der Trainingsdaten erfolgreich!")
-
-    # Prüfe ob das Modell bereits existiert
-    model = _load_model(user_id)
-    X_train, y_train, X_test, y_test = _preprocess_training_data(training_data)
-    # müsste dann vom shape batch_sizex3x4x15 sein
-
-    # Print all shapes
-    print("X_train shape: " + str(X_train.shape))
-    print("y_train shape: " + str(y_train.shape))
-    print("X_test shape: " + str(X_test.shape))
-    print("y_test shape: " + str(y_test.shape))
-
-    if (model is None):
-        # User has no model yet -> create a new one
-        print("User hat noch kein Modell -> erstelle ein neues Modell")
-
-        # LSTM Model, every data point has shape 3x4x15 (input dimensions)
-        # = Input -> 4 x 45 (Keras erwartet 3 Dimensionen inkl. Batch-size)
-        model = Sequential()
-
-        model.add(InputLayer(input_shape=(4, 45)))
-        model.add(LSTM(64))
-        model.add(Dense(8, activation='relu'))
-        model.add(Dense(1, activation='linear'))
-        model.summary()
-        model.compile(loss='mae', optimizer='adam')
-        history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
-
-        # Erstelle das Verzeichnis, wenn es nicht existiert
-        model_directory = "models/" + user_id
-        os.makedirs(model_directory, exist_ok=True)
-    else:
-        # User has a model -> load it and continue training
-        print("User hat bereits ein Modell -> lade es und trainiere nach")
-        history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
-
-    # Save the model
-    model.save("models/" + user_id + "/" + app_config.DEFAULT_MODEL_FILE_NAME)
-
-    if (app_config.ENABLE_LOG_TRAINING_RESULTS):
-        #plot_thread = Thread(target=_plot_history, args=(history,))
-        #plot_thread.start()
-        _plot_history_to_file(history, user_id)
-
-
+# Plot the training history for a user and save the png to a file
 def _plot_history_to_file(history, user_id):
     plt.plot(history.history['loss'], label='Training Loss')
     plt.plot(history.history['val_loss'], label='Validation Loss')
@@ -300,3 +208,18 @@ def _plot_history_to_file(history, user_id):
     now = datetime.now()
     time_identifier = now.strftime("%d_%m_%Y_%H_%M_%S")
     plt.savefig('training_plots/'+ str(user_id) + "__" + str(time_identifier) + '_plots.png')
+
+# Used for development only to create sample training data.
+# Returns 4 arrays of time series data (heart rate, sound in hz, visualisation type, breathing multiplier) with shape (40, 4, 15)
+def _test_get_sample_session_data(num_time_units=40):
+    session_data = []
+
+    for _ in range(num_time_units):
+        heart_rate = np.random.randint(60, 81, size=15)
+        binaural_beats = np.random.randint(30, 41, size=15)
+        visualization = np.random.randint(0, 6, size=15)
+        breath_multiplier = np.random.uniform(0.8, 1.6, size=15)
+
+        session_data.append([heart_rate, binaural_beats, visualization, breath_multiplier])
+
+    return np.array(session_data)
