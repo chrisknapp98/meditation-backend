@@ -1,3 +1,4 @@
+import logging
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -6,12 +7,14 @@ import os
 from datetime import datetime
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import *
-from tensorflow.keras.callbacks import ModelCheckpoint
-from tensorflow.keras.losses import MeanSquaredError
-from tensorflow.keras.metrics import RootMeanSquaredError
-from tensorflow.keras.optimizers import Adam
 from keras.models import load_model
-import app_config as app_config
+from datetime import datetime
+
+# Define constants
+DEFAULT_MODEL_FILE_NAME = os.getenv('DEFAULT_MODEL_FILE_NAME', 'model.keras')
+MODEL_SAVE_PATH = os.getenv('MODEL_SAVE_PATH', 'models')
+ENABLE_LOG_TRAINING_RESULTS = os.getenv('ENABLE_LOG_TRAINING_RESULTS', 'False').lower() == 'true'
+logging.basicConfig(level=getattr(logging, os.getenv('LOG_LEVEL', 'DEBUG')))
 
 
 # Predict the next heart rate for a given user based on the last two time units of the session.
@@ -53,6 +56,7 @@ def predict_next_heart_rate(session_data_two_time_units, user_id):
 
     return best_combination
 
+
 # Train the model with the given training data and user_id.
 # Make sure the shape of the training data is (40 x 4 x 15)
 def train_model_with_session_data(training_data, user_id):
@@ -68,7 +72,7 @@ def train_model_with_session_data(training_data, user_id):
     model = _load_model(user_id)
     X_train, y_train, X_test, y_test = _preprocess_training_data(training_data)
 
-    if (app_config.ENABLE_DETAILED_LOGGING):
+    if (ENABLE_LOG_TRAINING_RESULTS):
         print("Validierung der Trainingsdaten erfolgreich!")
         print("X_train shape: " + str(X_train.shape))
         print("y_train shape: " + str(y_train.shape))
@@ -93,14 +97,14 @@ def train_model_with_session_data(training_data, user_id):
         print("User hat bereits ein Modell -> lade es und trainiere nach")
         history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=2, shuffle=False)
 
-    model.save("models/" + user_id + "/" + app_config.DEFAULT_MODEL_FILE_NAME)
+    model.save("models/" + user_id + "/" + DEFAULT_MODEL_FILE_NAME)
 
-    if (app_config.ENABLE_LOG_TRAINING_RESULTS):
+    if (ENABLE_LOG_TRAINING_RESULTS):
         _plot_history_to_file(history, user_id)
+
 
 # Get random session configuration for the next time unit.
 def _get_next_random_config(heart_rate_arr):
-
     # Add missing values to fit model architecture (15 heart rate values) with linear interpolation
     additional_values = 15
     interp_indices = np.linspace(0, len(heart_rate_arr) - 1, additional_values)
@@ -123,54 +127,53 @@ def _get_next_random_config(heart_rate_arr):
 
 
 def _load_model(user_id):
-    model_path = "models/" + user_id + "/" + app_config.DEFAULT_MODEL_FILE_NAME
-    if (os.path.exists(model_path)):
-        print("Das Modell für den User " + user_id + " existiert bereits.")
+    model_path = f"{MODEL_SAVE_PATH}/{user_id}/{DEFAULT_MODEL_FILE_NAME}"
+    if os.path.exists(model_path):
+        logging.info(f"The model for the user {user_id} already exists.")
         model = load_model(model_path)
         return model
     else:
         print("Das Modell für den User " + user_id + " existiert nicht.")
         return None
-    
+
+
 # Preprocess the training data into the right format for the LSTM model using the sliding window approach
 # Shapes:
 # Input: training_data = (40 x 4 x 15)
 # Output: x_train = 455 x 4 x 45 // x_test = 100 x 4 x 45 // y_train = 455 x 1 // y_test = 100 x 1
 def _preprocess_training_data(training_data):
-
     # Convert the arrays into the right data format dividing into features and target
     # The features are the 4 arrays of time series data and the target is the next heart rate
     flattened_array = training_data.transpose(1, 0, 2).reshape((4, -1))
-    
-    if (app_config.ENABLE_DETAILED_LOGGING):
-        print("flattened array shape: " + str(flattened_array.shape))
-        print("flattened array (herz): " + str(flattened_array[0][:32]))
-        print("flattened array (sound): " + str(flattened_array[1][:32]))
-        print("flattened array(vis): " + str(flattened_array[2][:32]))
-        print("flattened array (breath): " + str(flattened_array[3][:32]))
-        print("------")
 
+    logging.debug(f"flattened array shape: {flattened_array.shape}")
+    logging.debug(f"flattened array (herz): {flattened_array[0][:32]}")
+    logging.debug(f"flattened array (sound): {flattened_array[1][:32]}")
+    logging.debug(f"flattened array (vis): {flattened_array[2][:32]}")
+    logging.debug(f"flattened array (breath): {flattened_array[3][:32]}")
 
     # Create training data in the right format with shape 455x4x45 (X_train)
     # Loop trough flattened array and create new arrays with shape (4, 30)
     X_train = []
     y_train = []
-    for i in range(0, flattened_array.shape[1]):
+    for i in range(flattened_array.shape[1]):
+        # print(flattened_array.shape)
+        # print(flattened_array)
 
         print("i: " + str(i))
         print(flattened_array.shape[1])
         if (i+45 >= flattened_array.shape[1]):
             print("break")
             break
-        
+
         # hearth rate as target
-        x_train_value = flattened_array[:, i:i+45]
-        y_label_value = flattened_array[0, i+45]
-        
+        x_train_value = flattened_array[:, i:i + 45]
+        y_label_value = flattened_array[0, i + 45]
+
         X_train.append(x_train_value)
         y_train.append(y_label_value)
 
-        if (app_config.ENABLE_DETAILED_LOGGING):
+        if (ENABLE_LOG_TRAINING_RESULTS):
             print("Durchlauf: - picke für X_train Elemente von " + str(i) + " bis " + str(i+45) + "; label index " + str(i+45) + "\n")
             print("x_train_shape: " + str(x_train_value.shape))
             print("y_label: " + str(y_label_value))
@@ -185,14 +188,12 @@ def _preprocess_training_data(training_data):
     X_train = X_train[:-100]
     y_train = y_train[:-100]
 
-    if (app_config.ENABLE_DETAILED_LOGGING):
-        print("Final training input (X_train) shape: " + str(X_train.shape)); 
-        print("Final training label (y_train) shape: " + str(y_train.shape))
-        print("Final test input (X_test) shape: " + str(X_test.shape))
-        print("Final test label (y_test) shape: " + str(y_test.shape))
+    logging.debug(f"Final training input (X_train) shape: {X_train.shape}")
+    logging.debug(f"Final training label (y_train) shape: {y_train.shape}")
+    logging.debug(f"Final test input (X_test) shape: {X_test.shape}")
+    logging.debug(f"Final test label (y_test) shape: {y_test.shape}")
 
-    print("Trainings und Testdaten erfolgreich erstellt!")
-
+    logging.info("Training and test data successfully created!")
     return X_train, y_train, X_test, y_test
 
 
@@ -200,14 +201,15 @@ def _preprocess_training_data(training_data):
 def _plot_history_to_file(history, user_id):
     plt.plot(history.history['loss'], label='Training Loss')
     plt.plot(history.history['val_loss'], label='Validation Loss')
-    plt.xlabel('Epochen')
+    plt.xlabel('Epochs')
     plt.ylabel('Loss')
-    plt.title('Trainingsverlauf des LSTM-Modells')
+    plt.title('Training Progress of the LSTM Model')
     plt.legend()
-    #plt.show()
+    # plt.show()
     now = datetime.now()
     time_identifier = now.strftime("%d_%m_%Y_%H_%M_%S")
     plt.savefig('training_plots/'+ str(user_id) + "__" + str(time_identifier) + '_plots.png')
+
 
 # Used for development only to create sample training data.
 # Returns 4 arrays of time series data (heart rate, sound in hz, visualisation type, breathing multiplier) with shape (40, 4, 15)

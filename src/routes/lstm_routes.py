@@ -1,10 +1,12 @@
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
+from flask import request, jsonify, Blueprint
 import numpy as np
 import lstm.meditation_lstm as meditation_lstm
 
+lstm_routes = Blueprint('lstm_routes', __name__)
+
 # This route predicts the next best session configuration (combination of binaural beats, visualization and breath frequency) 
 # based on the last two time units of the session.
+@lstm_routes.route("/predict", methods=['POST'])
 def predict():
     print("Request on /predict received.")
     request_data = request.json
@@ -23,6 +25,9 @@ def predict():
 
     prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units, user_id)
 
+    if (prediction is None):
+        return jsonify({'error': 'User hat noch kein Modell.'}), 400
+
     return jsonify({'best_combination': {
         'binauralBeatsInHz': prediction[1][0],
         'visualization': int(prediction[2][0]),
@@ -31,6 +36,7 @@ def predict():
 
 
 # This route trains the model with the given training data.
+@lstm_routes.route("/train_model", methods=['POST'])
 def train_model():
     print("Request on /train_model received.")
     request_data = request.json

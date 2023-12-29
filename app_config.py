@@ -1,4 +1,0 @@
-# Define app constants here
-ENABLE_LOG_TRAINING_RESULTS = True
-ENABLE_DETAILED_LOGGING = True
-DEFAULT_MODEL_FILE_NAME = "model.keras"
