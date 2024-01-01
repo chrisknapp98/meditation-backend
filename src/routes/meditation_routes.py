@@ -122,3 +122,23 @@ def create_meditation_session_from_data(data):
             ) for period in data['sessionPeriods']
         ]
     )
+
+def get_last_session_from_db(device_id):
+    db = current_app.config['db']
+    session = db.session.query(MeditationSession).filter_by(device_id=device_id).order_by(MeditationSession.date.desc()).first()
+    return session
+
+def remove_session_from_db(session):
+    db = current_app.config['db']
+    device_id = session['device_id']
+    date = session['date']
+    found_session = db.session.query(MeditationSession).filter_by(device_id=device_id).order_by(MeditationSession.date.desc()).first()
+    if found_session.to_dict()['date'] == date:
+        db.session.delete(found_session)
+        db.session.commit()
+
+def save_session_to_db(session):
+    db = current_app.config['db']
+    session_model = create_meditation_session_from_data(session)
+    db.session.add(session_model)
+    db.session.commit()
