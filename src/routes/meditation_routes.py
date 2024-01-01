@@ -27,9 +27,9 @@ def get_meditation_sessions():
         if not meditation_sessions:
             return jsonify({'message': 'No meditation sessions found'}), 404
 
-        result = {'meditation_sessions': []}
+        result = {'meditationSessions': []}
         for session in meditation_sessions:
-            result['meditation_sessions'].append(session.to_dict())
+            result['meditationSessions'].append(session.to_dict())
 
         return jsonify(result)
 
