@@ -8,34 +8,30 @@ lstm_routes = Blueprint('lstm_routes', __name__)
 
 @lstm_routes.route("/predict", methods=['POST'])
 def predict():
-    print("Request on /predict received.")
     request_data = request.json
+    
+    validated_data, error = validate_meditation_session_data(request_data)
+    if error:
+        error_message, status_code = error
+        return jsonify(error_message), status_code
 
-    required_fields = ['heart_rate_arr', 'binaural_beats_arr', 'visualization_arr', 'breath_multiplier_arr', 'user_id']
-    if not all(field in request_data for field in required_fields):
-        return jsonify({'error': 'Missing required fields in the request.'}), 400
+    device_id = validated_data['deviceId']
+    session_periods = []    
+    if len(validated_data['sessionPeriods']) < 2:
+        last_session = get_last_session_from_db(device_id)
+        session_periods = last_session.to_dict()['sessionPeriods'][-1:] + validated_data['sessionPeriods']
+    else:
+        session_periods = validated_data['sessionPeriods'][-2:]
 
-    heart_rate_arr = request_data['heart_rate_arr']
-    binaural_beats_arr = request_data['binaural_beats_arr']
-    visualization_arr = request_data['visualization_arr']
-    breath_multiplier_arr = request_data['breath_multiplier_arr']
-    user_id = request_data['user_id']
+    prediction_formatted_session_periods = map_session_periods_to_prediction_array(session_periods, visualization_mapping)
+    session_data_two_time_units = np.array(prediction_formatted_session_periods)
 
-    # print length of each array
-    print("Length of heart_rate_arr: " + str(len(heart_rate_arr)))
-    print("Length of binaural_beats_arr: " + str(len(binaural_beats_arr)))
-    print("Length of visualization_arr: " + str(len(visualization_arr)))
-    print("Length of breath_multiplier_arr: " + str(len(breath_multiplier_arr)))
+    prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units, device_id)
 
-    session_data_two_time_units = np.array(
-        [heart_rate_arr, binaural_beats_arr, visualization_arr, breath_multiplier_arr])
-
-    prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units, user_id)
-
-    return jsonify({'best_combination': {
-        'binauralBeatsInHz': prediction[1][0],
+    return jsonify({'bestCombination': {
+        'beatFrequency': prediction[1][0],
         'visualization': int(prediction[2][0]),
-        'breathFrequency': prediction[3][0]
+        'breathingPatternMultiplier': prediction[3][0]
     }})
 
 
@@ -83,6 +79,26 @@ def train_model():
 
     return jsonify({'message': 'Model for device ' + device_id + ' trained successfully.'})
 
+
+def map_session_periods_to_prediction_array(session_periods, visualization_mapping):
+    number_of_heart_rate_entries_per_period = len(session_periods[0]['heartRateMeasurements'])
+    heart_rate_arr = []
+    binaural_beats_arr = []
+    visualization_arr = []
+    breath_multiplier_arr = []
+    for period in session_periods:
+        heart_rate_arr += [hrm['heartRate'] for hrm in period['heartRateMeasurements']]
+        binaural_beats_arr += [period['beatFrequency']] * number_of_heart_rate_entries_per_period
+        visualization_arr += [visualization_mapping.get(period['visualization'], 0)] * number_of_heart_rate_entries_per_period
+        breath_multiplier_arr += [period['breathingPatternMultiplier']] * number_of_heart_rate_entries_per_period
+
+    # print length of each array
+    print("Length of heart_rate_arr: " + str(len(heart_rate_arr)))
+    print("Length of binaural_beats_arr: " + str(len(binaural_beats_arr)))
+    print("Length of visualization_arr: " + str(len(visualization_arr)))
+    print("Length of breath_multiplier_arr: " + str(len(breath_multiplier_arr)))
+
+    return [heart_rate_arr, binaural_beats_arr, visualization_arr, breath_multiplier_arr]
 
 def map_session_periods_to_training_data(session_periods, visualization_mapping):
     training_data = []
