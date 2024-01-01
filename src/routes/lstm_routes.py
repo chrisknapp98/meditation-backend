@@ -55,6 +55,11 @@ def train_model():
 
     elif validated_data['isCompleted']:
         previous_session = get_last_session_from_db(validated_data['deviceId'])
+        save_session_to_db(validated_data)
+        
+        if previous_session is None:
+            return jsonify({'message': 'Model for device ' + validated_data['deviceId'] + ' not trained. No previous session found.'})
+
         combined_session_periods = previous_session.to_dict()['sessionPeriods'] + validated_data['sessionPeriods']
         training_data_arr = map_session_periods_to_training_data(combined_session_periods, visualization_mapping)
         print("Length of training_data_arr: " + str(len(training_data_arr)))
@@ -73,9 +78,6 @@ def train_model():
     device_id = validated_data['deviceId']
 
     meditation_lstm.train_model_with_session_data(training_data, device_id)
-
-    if validated_data['isCompleted']:
-        save_session_to_db(validated_data)
 
     return jsonify({'message': 'Model for device ' + device_id + ' trained successfully.'})
 
