@@ -47,6 +47,21 @@ def create_meditation_session():
     if not data:
         return jsonify({'error': 'Invalid request body'}), 400
 
+    validated_data, error = validate_meditation_session_data(data)
+    if error:
+        error_message, status_code = error
+        return jsonify(error_message), status_code
+
+    # Your logic to create a meditation session goes here...
+    meditation_session = create_meditation_session_from_data(validated_data)
+
+    db.session.add(meditation_session)
+    db.session.commit()
+
+    return jsonify({'message': 'Meditation session created successfully'}), 201
+
+
+def validate_meditation_session_data(data):
     # Validate required fields in the request body
     required_fields = [
         'deviceId',
@@ -58,7 +73,7 @@ def create_meditation_session():
     ]
     for field in required_fields:
         if field not in data:
-            return jsonify({'error': f'Missing required field: {field}'}), 400
+            return None, ({'error': f'Missing required field: {field}'}, 400)
 
     required_fields_in_session_periods = [
         'heartRateMeasurements',
@@ -71,46 +86,39 @@ def create_meditation_session():
     for index, period in enumerate(data['sessionPeriods']):
         for field in required_fields_in_session_periods:
             if field not in period:
-                return jsonify({'error': f'Missing required field: {field} in session period at index {index}'}), 400
+                return None, ({'error': f'Missing required field: {field} in session period at index {index}'}, 400)
 
-    required_fields_in_heart_rate_measurements = [
-        'date',
-        'heartRate',
-    ]
-    for index, period in enumerate(data['sessionPeriods']):
+        required_fields_in_heart_rate_measurements = [
+            'date',
+            'heartRate',
+        ]
         for index2, measurement in enumerate(period['heartRateMeasurements']):
             for field in required_fields_in_heart_rate_measurements:
                 if field not in measurement:
-                    return jsonify({'error': f'Missing required field: {field} in heart rate measurement at index {index2} in session period at index {index}'}), 400
+                    return None, ({'error': f'Missing required field: {field} in heart rate measurement at index {index2} in session period at index {index}'}, 400)
 
-    # Your logic to create a meditation session goes here...
-    meditation_session = MeditationSession(
-        device_id=data.get('deviceId'),
-        date=datetime.strptime(data.get('date'), '%Y-%m-%dT%H:%M:%S.%fZ'),
-        duration=data.get('duration'),
-        is_completed=data.get('isCompleted'),
-        is_canceled=data.get('isCanceled'),
+    return data, None
+
+def create_meditation_session_from_data(data):
+    return MeditationSession(
+        device_id=data['deviceId'],
+        date=datetime.strptime(data['date'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+        duration=data['duration'],
+        is_completed=data['isCompleted'],
+        is_canceled=data['isCanceled'],
         session_periods=[
             SessionPeriod(
                 heart_rate_measurements=[
                     HeartRateMeasurement(
-                        measurement_date=datetime.strptime(measurement.get('date'), '%Y-%m-%dT%H:%M:%S.%fZ'),
-                        heart_rate=measurement.get('heartRate')
-                    ) for measurement in period.get('heartRateMeasurements')
+                        measurement_date=datetime.strptime(measurement['date'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                        heart_rate=measurement['heartRate']
+                    ) for measurement in period['heartRateMeasurements']
                 ],
-                visualization=period.get('visualization'),
-                beat_frequency=period.get('beatFrequency'),
-                breathing_pattern=period.get('breathingPattern'),
-                breathing_pattern_multiplier=period.get('breathingPatternMultiplier'),
-                is_haptic_feedback_enabled=period.get('isHapticFeedbackEnabled')
-            ) for period in data.get('sessionPeriods')
+                visualization=period['visualization'],
+                beat_frequency=period['beatFrequency'],
+                breathing_pattern=period['breathingPattern'],
+                breathing_pattern_multiplier=period['breathingPatternMultiplier'],
+                is_haptic_feedback_enabled=period['isHapticFeedbackEnabled']
+            ) for period in data['sessionPeriods']
         ]
     )
-
-    # Add the meditation session to the database
-    db.session.add(meditation_session)
-    db.session.commit()
-
-    return jsonify({'message': 'Meditation session created successfully'}), 201
-
-
