@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from flask import current_app, request, jsonify
 
-from models import MeditationSession, SessionPeriod
+from models import HeartRateMeasurement, MeditationSession, SessionPeriod
 
 meditation_routes = Blueprint('meditation_routes', __name__)
 
@@ -73,6 +73,16 @@ def create_meditation_session():
             if field not in period:
                 return jsonify({'error': f'Missing required field: {field} in session period at index {index}'}), 400
 
+    required_fields_in_heart_rate_measurements = [
+        'date',
+        'heartRate',
+    ]
+    for index, period in enumerate(data['sessionPeriods']):
+        for index2, measurement in enumerate(period['heartRateMeasurements']):
+            for field in required_fields_in_heart_rate_measurements:
+                if field not in measurement:
+                    return jsonify({'error': f'Missing required field: {field} in heart rate measurement at index {index2} in session period at index {index}'}), 400
+
     # Your logic to create a meditation session goes here...
     meditation_session = MeditationSession(
         device_id=data.get('deviceId'),
@@ -82,7 +92,12 @@ def create_meditation_session():
         is_canceled=data.get('isCanceled'),
         session_periods=[
             SessionPeriod(
-                heart_rate_measurements=period.get('heartRateMeasurements'),
+                heart_rate_measurements=[
+                    HeartRateMeasurement(
+                        measurement_date=datetime.strptime(measurement.get('date'), '%Y-%m-%dT%H:%M:%S.%fZ'),
+                        heart_rate=measurement.get('heartRate')
+                    ) for measurement in period.get('heartRateMeasurements')
+                ],
                 visualization=period.get('visualization'),
                 beat_frequency=period.get('beatFrequency'),
                 breathing_pattern=period.get('breathingPattern'),
