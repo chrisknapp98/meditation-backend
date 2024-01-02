@@ -142,3 +142,8 @@ def save_session_to_db(session):
     session_model = create_meditation_session_from_data(session)
     db.session.add(session_model)
     db.session.commit()
+
+def get_all_sessions_from_db(device_id):
+    db = current_app.config['db']
+    sessions = db.session.query(MeditationSession).filter_by(device_id=device_id).all()
+    return sessions

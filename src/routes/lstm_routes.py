@@ -1,7 +1,7 @@
 from flask import request, jsonify, Blueprint
 import numpy as np
 import lstm.meditation_lstm as meditation_lstm
-from routes.meditation_routes import validate_meditation_session_data, get_last_session_from_db, remove_session_from_db, save_session_to_db
+from routes.meditation_routes import validate_meditation_session_data, get_last_session_from_db, remove_session_from_db, save_session_to_db, get_all_sessions_from_db
 
 lstm_routes = Blueprint('lstm_routes', __name__)
 
@@ -16,6 +16,12 @@ def predict():
         return jsonify(error_message), status_code
 
     device_id = validated_data['deviceId']
+
+    # get all meditation sessions for device_id from db
+    all_sessions = get_all_sessions_from_db(device_id)
+    if len(all_sessions) < 2:
+        return jsonify({'message': 'Couldn\'t predict best combination for ' + device_id + '. Not enough data available.'})
+
     session_periods = []    
     if len(validated_data['sessionPeriods']) < 2:
         last_session = get_last_session_from_db(device_id)
