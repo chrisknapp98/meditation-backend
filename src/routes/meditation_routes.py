@@ -75,6 +75,9 @@ def validate_meditation_session_data(data):
         if field not in data:
             return None, ({'error': f'Missing required field: {field}'}, 400)
 
+    if len(data['deviceId']) == 0:
+        return None, ({'error': 'Device ID is empty. Please provide a valid device ID.'}, 400)
+
     required_fields_in_session_periods = [
         'heartRateMeasurements',
         'visualization',
@@ -95,9 +98,12 @@ def validate_meditation_session_data(data):
         for index2, measurement in enumerate(period['heartRateMeasurements']):
             for field in required_fields_in_heart_rate_measurements:
                 if field not in measurement:
-                    return None, ({'error': f'Missing required field: {field} in heart rate measurement at index {index2} in session period at index {index}'}, 400)
+                    return None, ({'error': f'Missing required field: {field} in heart rate measurement at index '
+                                            f'{index2} in session period at index {index}'},
+                                  400)
 
     return data, None
+
 
 def create_meditation_session_from_data(data):
     return MeditationSession(
@@ -123,25 +129,31 @@ def create_meditation_session_from_data(data):
         ]
     )
 
+
 def get_last_session_from_db(device_id):
     db = current_app.config['db']
-    session = db.session.query(MeditationSession).filter_by(device_id=device_id).order_by(MeditationSession.date.desc()).first()
+    session = db.session.query(MeditationSession).filter_by(device_id=device_id).order_by(
+        MeditationSession.date.desc()).first()
     return session
+
 
 def remove_session_from_db(session):
     db = current_app.config['db']
     device_id = session['device_id']
     date = session['date']
-    found_session = db.session.query(MeditationSession).filter_by(device_id=device_id).order_by(MeditationSession.date.desc()).first()
+    found_session = db.session.query(MeditationSession).filter_by(device_id=device_id).order_by(
+        MeditationSession.date.desc()).first()
     if found_session.to_dict()['date'] == date:
         db.session.delete(found_session)
         db.session.commit()
+
 
 def save_session_to_db(session):
     db = current_app.config['db']
     session_model = create_meditation_session_from_data(session)
     db.session.add(session_model)
     db.session.commit()
+
 
 def get_all_sessions_from_db(device_id):
     db = current_app.config['db']

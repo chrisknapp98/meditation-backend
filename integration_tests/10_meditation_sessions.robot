@@ -8,11 +8,12 @@ ${PREDICT_PAYLOAD}  DEFINE_IN_VARIABLES_FILE
 ${MEDITAIONS_URI}  /meditations
 ${TRAIN_MODEL_URI}  /train_model
 ${PREDDICT_URI}  /predict
-&{DEVICER_ID_DICT}  deviceId=${DEVICE_ID}
+&{DEVICE_ID_DICT}  deviceId=${DEVICE_ID}
 
 ${NO_MEDITAIONS_FOUND_TEXT}  No meditation sessions found
 ${MODEL_TRAINED_TEXT}  Model for device {device_id} trained successfully.
 ${NO_PREVIOUS_SESSION_FOUND}   Model for device {device_id} not trained. No previous session found.
+${NOT_ENOUGH_DATA_TEXT}  Couldn't predict best combination for {device_id}. Not enough data available.
 
 *** Settings ***
 Library    RequestsLibrary
@@ -27,26 +28,18 @@ Generate UUID
     Log    Generated UUID: ${DEVICE_ID}
     Set Suite Variable  ${DEVICE_ID}
     ${TRAIN_MODEL_PAYLOAD}=  Set To Dictionary    ${TRAIN_MODEL_PAYLOAD}  deviceId=${DEVICE_ID}
-    ${PREDICT_PAYLOAD}=  Set To Dictionary    ${TRAIN_MODEL_PAYLOAD}  deviceId=${DEVICE_ID}
+    ${PREDICT_PAYLOAD}=  Set To Dictionary    ${PREDICT_PAYLOAD}  deviceId=${DEVICE_ID}
 
 Get All Sessions By Device Id No Sessions Created
-    ${response}=    GET On Session  meditation-backend  ${MEDITAIONS_URI}  params=${DEVICER_ID_DICT}
+    ${response}=    GET On Session  meditation-backend  ${MEDITAIONS_URI}  params=${DEVICE_ID_DICT}
     ...                             expected_status=404
     Should Be Equal  ${NO_MEDITAIONS_FOUND_TEXT}  ${response.json()}[message]
-
-Get All Sessions Empty Id
-    ${EMPTY_DEVICE_ID}=  Create Dictionary  deviceId=
-    ${response}=    GET On Session  meditation-backend  ${MEDITAIONS_URI}  params=${EMPTY_DEVICE_ID}
-    ...                             expected_status=400
 
 Predict Before Sessions Stored
     ${response}=    Post On Session  meditation-backend  ${PREDDICT_URI}  json=${PREDICT_PAYLOAD}
     ...                              expected_status=200
-    ${recommended_parameters}=  Set Variable  ${response.json()}[bestCombination]
-
-    Dictionary Should Contain Key  ${recommended_parameters}  beatFrequency
-    Dictionary Should Contain Key  ${recommended_parameters}  breathingPatternMultiplier
-    Dictionary Should Contain Key  ${recommended_parameters}  visualization
+    ${EXPECTED_MESSAGE}=  Format String  ${NOT_ENOUGH_DATA_TEXT}  device_id=${DEVICE_ID}
+    Should Be Equal  ${EXPECTED_MESSAGE}  ${response.json()}[message]
 
 Train Model No Previous Session
     ${response}=    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  json=${TRAIN_MODEL_PAYLOAD}

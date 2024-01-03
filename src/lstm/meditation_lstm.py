@@ -18,6 +18,7 @@ MODEL_SAVE_PATH = os.getenv('MODEL_SAVE_PATH', 'models')
 ENABLE_LOG_TRAINING_RESULTS = os.getenv('ENABLE_LOG_TRAINING_RESULTS', 'False').lower() == 'true'
 logging.basicConfig(level=getattr(logging, os.getenv('LOG_LEVEL', 'DEBUG')))
 
+
 # from matplotlib import pyplot as plt
 # WARNING:absl:At this time, the v2.11+ optimizer `tf.keras.optimizers.Adam` runs slowly on M1/M2 Macs, please use the legacy Keras optimizer instead, located at `tf.keras.optimizers.legacy.Adam`.
 
@@ -87,7 +88,6 @@ def _load_model(user_id):
         logging.info(f"The model for the user {user_id} does not exist.")
 
 
-
 # Input: (40 x 4 x 15)
 # Output:
 # x_train - 455 x 4 x 45
@@ -108,7 +108,6 @@ def _preprocess_training_data(training_data):
     logging.debug(f"flattened array (sound): {flattened_array[1][:32]}")
     logging.debug(f"flattened array (vis): {flattened_array[2][:32]}")
     logging.debug(f"flattened array (breath): {flattened_array[3][:32]}")
-
 
     # Create training data in the right format with shape (?x)4x30 (X_train)
     # y_train 1 value (heart rate)
