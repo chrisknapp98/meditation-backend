@@ -26,3 +26,8 @@ jobs:
     - name: Run robot tests
       run: |
         ./integration_tests/run_tests.sh
+    - name: Archive test log
+      uses: actions/upload-artifact@v3
+      with:
+        name: integration-test-logs
+        path: integration_tests/integration_test_results/log.html
