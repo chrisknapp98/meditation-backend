@@ -13,6 +13,7 @@ jobs:
     - name: Deploy Docker containers
       run: |
         cd integration
+        cp .env.template .env
         docker compose up -d --wait
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
