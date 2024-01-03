@@ -54,30 +54,28 @@ def train_model():
         return jsonify(error_message), status_code
     
     training_data_arr = []
-    
-    if validated_data['isCanceled']: # delete here if we decide to store anything in the db from predict route
-        # remove_session_from_db(validated_data)
 
-        # last_session = get_last_session_from_db(validated_data['deviceId'])
-        # training_data_arr = map_session_periods_to_training_data(last_session.sessionPeriods)
-        return jsonify({'message': 'Model for device ' + validated_data['deviceId'] + ' was not trained as session was canceled.'})
-
-    elif validated_data['isCompleted']:
-        previous_session = get_last_session_from_db(validated_data['deviceId'])
+    if validated_data['isCompleted']:
+        previous_sessions = get_all_sessions_from_db(validated_data['deviceId'])
         save_session_to_db(validated_data)
 
-        if previous_session is None:
-            return jsonify({'message': 'Model for device ' + validated_data['deviceId'] + ' not trained. No previous session found.'})
+        if not previous_sessions:
+            return jsonify({'message': 'Session saved, but Model for device ' + validated_data['deviceId'] + ' was not trained as no previous session was found.'})
 
-        combined_session_periods = previous_session.to_dict()['sessionPeriods'] + validated_data['sessionPeriods']
+        combined_session_periods = validated_data['sessionPeriods'].copy()
+        previous_sessions.reverse()
+        # Iterate over the reversed previous_sessions and add periods until batch_size is reached
+        for session in previous_sessions:
+            if len(combined_session_periods) < training_data_arr_size:
+                additional_periods_needed = training_data_arr_size - len(combined_session_periods)
+                session_periods = session.to_dict()['sessionPeriods']
+                # Take only as many periods as needed from this session
+                combined_session_periods.extend(session_periods[:additional_periods_needed])
+            else:
+                break
+
         training_data_arr = map_session_periods_to_training_data(combined_session_periods)
         print("Length of training_data_arr: " + str(len(training_data_arr)))
-
-    # elif (validated_data.sessionPeriods.length < 2):
-    #     last_session = get_last_session_from_db(validated_data['deviceId'])
-    #     combined_session_periods = last_session.sessionPeriods + validated_data.sessionPeriods
-    #     training_data_arr = map_session_periods_to_training_data(combined_session_periods)
-    
     else: 
         return jsonify({'message': 'Model for device ' + validated_data['deviceId'] + ' not trained. Session did not complete.'})
 
@@ -146,3 +144,5 @@ def get_visualization_number(visualization_name):
 def get_visualization_name(visualization_number):
     """Convert visualization number back to its corresponding name."""
     return visualization_mapping_num_to_str.get(visualization_number)
+
+training_data_arr_size = 40
