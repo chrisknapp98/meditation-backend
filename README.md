@@ -26,3 +26,9 @@ To view the logs from the rest-server container, the command `docker logs rest-s
 After editing the `server.py` script it's necessary to rebuild its docker image:
 
 `docker compose up -d --build --wait`
+
+# integration tests
+
+## run tests
+
+`pip install -r requirements-test.txt`
