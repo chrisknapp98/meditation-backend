@@ -1,3 +1,4 @@
+import logging
 from flask import request, jsonify, Blueprint
 import numpy as np
 import lstm.meditation_lstm as meditation_lstm
@@ -35,7 +36,7 @@ def predict():
     prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units, device_id)
     
     # Debugging: print the predicted visualization number
-    print("Predicted visualization number:", prediction[2][0])
+    logging.info("Predicted visualization number:", prediction[2][0])
 
     return jsonify({'bestCombination': {
         'beatFrequency': prediction[1][0],
@@ -75,13 +76,13 @@ def train_model():
                 break
 
         training_data_arr = map_session_periods_to_training_data(combined_session_periods)
-        print("Length of training_data_arr: " + str(len(training_data_arr)))
+        logging.info("Length of training_data_arr: " + str(len(training_data_arr)))
     else: 
         return jsonify({'message': 'Model for device ' + validated_data['deviceId'] + ' not trained. Session did not complete.'})
 
     training_data = np.array(training_data_arr)
 
-    print("Shape of training_data_arr: " + str(np.shape(training_data)))
+    logging.info("Shape of training_data_arr: " + str(np.shape(training_data)))
     device_id = validated_data['deviceId']
 
     meditation_lstm.train_model_with_session_data(training_data, device_id)
@@ -102,10 +103,10 @@ def map_session_periods_to_prediction_array(session_periods):
         breath_multiplier_arr += [period['breathingPatternMultiplier']] * number_of_heart_rate_entries_per_period
 
     # print length of each array
-    print("Length of heart_rate_arr: " + str(len(heart_rate_arr)))
-    print("Length of binaural_beats_arr: " + str(len(binaural_beats_arr)))
-    print("Length of visualization_arr: " + str(len(visualization_arr)))
-    print("Length of breath_multiplier_arr: " + str(len(breath_multiplier_arr)))
+    logging.info("Length of heart_rate_arr: " + str(len(heart_rate_arr)))
+    logging.info("Length of binaural_beats_arr: " + str(len(binaural_beats_arr)))
+    logging.info("Length of visualization_arr: " + str(len(visualization_arr)))
+    logging.info("Length of breath_multiplier_arr: " + str(len(breath_multiplier_arr)))
 
     return [heart_rate_arr, binaural_beats_arr, visualization_arr, breath_multiplier_arr]
 

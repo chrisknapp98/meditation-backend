@@ -1,3 +1,4 @@
+import logging
 from flask import Flask, request, jsonify, Blueprint
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
@@ -34,7 +35,7 @@ def get_meditation_sessions():
         return jsonify(result)
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logging.info(f"An error occurred: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
 
