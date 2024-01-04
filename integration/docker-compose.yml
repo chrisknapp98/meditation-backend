@@ -30,7 +30,6 @@ services:
       MODEL_SAVE_PATH: /app/models
     volumes:
       - ${MODEL_PATH}:/app/models
-      - ../src:/app/src  # Mount the source code directory
     healthcheck:
       test:
         [
