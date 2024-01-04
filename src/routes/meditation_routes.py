@@ -1,9 +1,10 @@
+import logging
 from flask import Flask, request, jsonify, Blueprint
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from flask import current_app, request, jsonify
 
-from models import MeditationSession, SessionPeriod
+from models import HeartRateMeasurement, MeditationSession, SessionPeriod
 
 meditation_routes = Blueprint('meditation_routes', __name__)
 
@@ -27,14 +28,14 @@ def get_meditation_sessions():
         if not meditation_sessions:
             return jsonify({'message': 'No meditation sessions found'}), 404
 
-        result = {'meditation_sessions': []}
+        result = {'meditationSessions': []}
         for session in meditation_sessions:
-            result['meditation_sessions'].append(session.to_dict())
+            result['meditationSessions'].append(session.to_dict())
 
         return jsonify(result)
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logging.info(f"An error occurred: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
 
@@ -47,6 +48,21 @@ def create_meditation_session():
     if not data:
         return jsonify({'error': 'Invalid request body'}), 400
 
+    validated_data, error = validate_meditation_session_data(data)
+    if error:
+        error_message, status_code = error
+        return jsonify(error_message), status_code
+
+    # Your logic to create a meditation session goes here...
+    meditation_session = create_meditation_session_from_data(validated_data)
+
+    db.session.add(meditation_session)
+    db.session.commit()
+
+    return jsonify({'message': 'Meditation session created successfully'}), 201
+
+
+def validate_meditation_session_data(data):
     # Validate required fields in the request body
     required_fields = [
         'deviceId',
@@ -58,7 +74,7 @@ def create_meditation_session():
     ]
     for field in required_fields:
         if field not in data:
-            return jsonify({'error': f'Missing required field: {field}'}), 400
+            return None, ({'error': f'Missing required field: {field}'}, 400)
 
     required_fields_in_session_periods = [
         'heartRateMeasurements',
@@ -71,31 +87,64 @@ def create_meditation_session():
     for index, period in enumerate(data['sessionPeriods']):
         for field in required_fields_in_session_periods:
             if field not in period:
-                return jsonify({'error': f'Missing required field: {field} in session period at index {index}'}), 400
+                return None, ({'error': f'Missing required field: {field} in session period at index {index}'}, 400)
 
-    # Your logic to create a meditation session goes here...
-    meditation_session = MeditationSession(
-        device_id=data.get('deviceId'),
-        date=datetime.strptime(data.get('date'), '%Y-%m-%dT%H:%M:%S.%fZ'),
-        duration=data.get('duration'),
-        is_completed=data.get('isCompleted'),
-        is_canceled=data.get('isCanceled'),
+        required_fields_in_heart_rate_measurements = [
+            'date',
+            'heartRate',
+        ]
+        for index2, measurement in enumerate(period['heartRateMeasurements']):
+            for field in required_fields_in_heart_rate_measurements:
+                if field not in measurement:
+                    return None, ({'error': f'Missing required field: {field} in heart rate measurement at index {index2} in session period at index {index}'}, 400)
+
+    return data, None
+
+def create_meditation_session_from_data(data):
+    return MeditationSession(
+        device_id=data['deviceId'],
+        date=datetime.strptime(data['date'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+        duration=data['duration'],
+        is_completed=data['isCompleted'],
+        is_canceled=data['isCanceled'],
         session_periods=[
             SessionPeriod(
-                heart_rate_measurements=period.get('heartRateMeasurements'),
-                visualization=period.get('visualization'),
-                beat_frequency=period.get('beatFrequency'),
-                breathing_pattern=period.get('breathingPattern'),
-                breathing_pattern_multiplier=period.get('breathingPatternMultiplier'),
-                is_haptic_feedback_enabled=period.get('isHapticFeedbackEnabled')
-            ) for period in data.get('sessionPeriods')
+                heart_rate_measurements=[
+                    HeartRateMeasurement(
+                        measurement_date=datetime.strptime(measurement['date'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                        heart_rate=measurement['heartRate']
+                    ) for measurement in period['heartRateMeasurements']
+                ],
+                visualization=period['visualization'],
+                beat_frequency=period['beatFrequency'],
+                breathing_pattern=period['breathingPattern'],
+                breathing_pattern_multiplier=period['breathingPatternMultiplier'],
+                is_haptic_feedback_enabled=period['isHapticFeedbackEnabled']
+            ) for period in data['sessionPeriods']
         ]
     )
 
-    # Add the meditation session to the database
-    db.session.add(meditation_session)
+def get_last_session_from_db(device_id):
+    db = current_app.config['db']
+    session = db.session.query(MeditationSession).filter_by(device_id=device_id).order_by(MeditationSession.date.desc()).first()
+    return session
+
+def remove_session_from_db(session):
+    db = current_app.config['db']
+    device_id = session['device_id']
+    date = session['date']
+    found_session = db.session.query(MeditationSession).filter_by(device_id=device_id).order_by(MeditationSession.date.desc()).first()
+    if found_session.to_dict()['date'] == date:
+        db.session.delete(found_session)
+        db.session.commit()
+
+def save_session_to_db(session):
+    db = current_app.config['db']
+    session_model = create_meditation_session_from_data(session)
+    db.session.add(session_model)
     db.session.commit()
 
-    return jsonify({'message': 'Meditation session created successfully'}), 201
-
-
+def get_all_sessions_from_db(device_id):
+    db = current_app.config['db']
+    sessions = db.session.query(MeditationSession).filter_by(device_id=device_id).all()
+    return sessions
