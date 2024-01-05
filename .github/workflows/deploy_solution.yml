@@ -1,0 +1,22 @@
+name: remote ssh command
+on:
+  push:
+    paths:
+      - src/**
+      - requirements.txt
+      - Dockerfile
+      - integration/**
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: executing remote ssh commands using password
+      uses: appleboy/ssh-action@v1.0.2
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.KEY }}
+        script: |
+          cd ~/workspace/meditation-backend/integration
+          ./start_solution.sh
