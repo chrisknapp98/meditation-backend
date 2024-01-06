@@ -12,7 +12,7 @@ ${PREDICT_URI}  /predict
 
 ${NO_MEDITAIONS_FOUND_TEXT}  No meditation sessions found
 ${MODEL_TRAINED_TEXT}  Model for device {device_id} trained successfully.
-${NO_PREVIOUS_SESSION_FOUND}   Model for device {device_id} not trained. No previous session found.
+${NO_PREVIOUS_SESSION_FOUND}  Session saved, but Model for device {device_id} was not trained as no previous session was found.
 ${NOT_ENOUGH_DATA_TEXT}  Couldn't predict best combination for {device_id}. Not enough data available.
 
 *** Settings ***
