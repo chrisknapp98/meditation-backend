@@ -2,6 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
+
 class MeditationSession(db.Model):
     __tablename__ = 'meditation_sessions'
     id = db.Column(db.Integer, primary_key=True)
