@@ -3,6 +3,7 @@ import os
 from flask import Flask
 from dotenv import load_dotenv
 from routes.lstm_routes import lstm_routes
+from routes.service_routes import service_routes
 from models import db
 from routes.meditation_routes import meditation_routes
 
@@ -25,6 +26,7 @@ app.config['app'] = app
 
 app.register_blueprint(lstm_routes)
 app.register_blueprint(meditation_routes)
+app.register_blueprint(service_routes)
 
 if __name__ == '__main__':
     with app.app_context():
