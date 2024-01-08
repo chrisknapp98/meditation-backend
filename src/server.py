@@ -30,8 +30,7 @@ app.register_blueprint(service_routes)
 
 if __name__ == '__main__':
     # (re)initialize DB if 'INITIALIZE_DB' is set to 'true'
-    if os.getenv("INITIALIZE_DB", "False").lower() == 'true':
+    if os.getenv("INITIALIZE_DB", "True").lower() == 'true':
         with app.app_context():
-            db.drop_all()
             db.create_all()
     app.run(port=server_port, debug=True, threaded=True, host='0.0.0.0')

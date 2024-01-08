@@ -14,6 +14,7 @@ jobs:
       run: |
         cd integration
         cp .env.template .env
+        export INITIALIZE_DB=true
         docker compose up -d --wait
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
