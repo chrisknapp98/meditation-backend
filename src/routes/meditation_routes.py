@@ -53,11 +53,14 @@ def create_meditation_session():
         error_message, status_code = error
         return jsonify(error_message), status_code
 
-    # Your logic to create a meditation session goes here...
-    meditation_session = create_meditation_session_from_data(validated_data)
-
-    db.session.add(meditation_session)
-    db.session.commit()
+    try:
+        meditation_session = create_meditation_session_from_data(validated_data)
+        db.session.add(meditation_session)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logging.error('An error occurred while creating a session: %s', e)
+        return jsonify({'error': 'An error occurred while saving a session.'}), 500
 
     return jsonify({'message': 'Meditation session created successfully'}), 201
 
@@ -151,9 +154,13 @@ def remove_session_from_db(session):
 
 def save_session_to_db(session):
     db = current_app.config['db']
-    session_model = create_meditation_session_from_data(session)
-    db.session.add(session_model)
-    db.session.commit()
+    try:
+        session_model = create_meditation_session_from_data(session)
+        db.session.add(session_model)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def get_all_sessions_from_db(device_id):
