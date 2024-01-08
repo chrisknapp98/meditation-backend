@@ -6,6 +6,7 @@ on:
       - requirements.txt
       - Dockerfile
       - integration/**
+      - .github/workflows/deploy_solution.yml
 jobs:
   build:
     name: Build
