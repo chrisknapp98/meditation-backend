@@ -2,7 +2,8 @@ import logging
 from flask import request, jsonify, Blueprint
 import numpy as np
 import lstm.meditation_lstm as meditation_lstm
-from routes.meditation_routes import validate_meditation_session_data, get_last_session_from_db, remove_session_from_db, save_session_to_db, get_all_sessions_from_db
+from routes.meditation_routes import (validate_meditation_session_data, get_last_session_from_db, save_session_to_db,
+                                      get_all_sessions_from_db)
 
 lstm_routes = Blueprint('lstm_routes', __name__)
 
@@ -10,7 +11,7 @@ lstm_routes = Blueprint('lstm_routes', __name__)
 @lstm_routes.route("/predict", methods=['POST'])
 def predict():
     request_data = request.json
-    
+
     validated_data, error = validate_meditation_session_data(request_data)
     if error:
         error_message, status_code = error
@@ -23,7 +24,7 @@ def predict():
     if len(all_sessions) < 2:
         return jsonify({'message': 'Couldn\'t predict best combination for ' + device_id + '. Not enough data available.'})
 
-    session_periods = []    
+    session_periods = []
     if len(validated_data['sessionPeriods']) < 2:
         last_session = get_last_session_from_db(device_id)
         session_periods = last_session.to_dict()['sessionPeriods'][-1:] + validated_data['sessionPeriods']
@@ -34,7 +35,7 @@ def predict():
     session_data_two_time_units = np.array(prediction_formatted_session_periods)
 
     prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units, device_id)
-    
+
     # Debugging: print the predicted visualization number
     logging.info("Predicted visualization number:", prediction[2][0])
 
@@ -53,13 +54,14 @@ def train_model():
     if error:
         error_message, status_code = error
         return jsonify(error_message), status_code
-    
-    training_data_arr = []
 
     if validated_data['isCompleted']:
         previous_sessions = get_all_sessions_from_db(validated_data['deviceId'])
-        save_session_to_db(validated_data)
-
+        try:
+            save_session_to_db(validated_data)
+        except Exception as e:
+            logging.error('An error occurred while saving a session: %s', e)
+            return jsonify({'error': 'An error occurred while saving a session.'}), 500
         if not previous_sessions:
             return jsonify({'message': 'Session saved, but Model for device ' + validated_data['deviceId'] + ' was not trained as no previous session was found.'})
 
@@ -77,7 +79,7 @@ def train_model():
 
         training_data_arr = map_session_periods_to_training_data(combined_session_periods)
         logging.info("Length of training_data_arr: " + str(len(training_data_arr)))
-    else: 
+    else:
         return jsonify({'message': 'Model for device ' + validated_data['deviceId'] + ' not trained. Session did not complete.'})
 
     training_data = np.array(training_data_arr)
