@@ -82,3 +82,6 @@ With each commit, the tests are executed within a CI/CD pipeline of the reposito
 The test results can be downloaded as a zip archive from there. 
 This ensures that the code consistently meets a certain quality standard, and changes do not break previously 
 functional code.
+
+![activity diagram CI/CD pipeline](https://www.plantuml.com/plantuml/svg/VP2nRiCW68HtdkB6n4ltU6ZKTEcMeIz0pJd-5GA8_yUgtxx4xLpf1k3kFg4xg_bgxH6TYKNYyl5oUSTL2gCauirFTwRWzfGxNPiki8pAabKirsrqfyz555qv8N3khT2FJhco-eXXU89q64RdPCRXwvU8AGTYyOffyUd6y7g4BKmuRDIZ0qwr9KWotgetwMoZcevFfzIyIk3-WafjqHI-gqwBh1p_RxSIl1619URjmMJezYhLcezu-8v87S6en27b_Ijwbm9-iqqxAyyeVmFrO0eoEwUMYpltIv_o1m00)
+
