@@ -18,6 +18,7 @@ MODEL_SAVE_PATH = os.getenv('MODEL_SAVE_PATH', 'models')
 ENABLE_LOG_TRAINING_RESULTS = os.getenv('ENABLE_LOG_TRAINING_RESULTS', 'False').lower() == 'true'
 logging.basicConfig(level=getattr(logging, os.getenv('LOG_LEVEL', 'DEBUG')))
 
+TRAINING_DATA_ARR_SIZE: int = 40
 
 # from matplotlib import pyplot as plt
 # WARNING:absl:At this time, the v2.11+ optimizer `tf.keras.optimizers.Adam` runs slowly on M1/M2 Macs, please use the legacy Keras optimizer instead, located at `tf.keras.optimizers.legacy.Adam`.

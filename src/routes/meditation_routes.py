@@ -1,6 +1,5 @@
 import logging
-from flask import Flask, request, jsonify, Blueprint
-from flask_sqlalchemy import SQLAlchemy
+from flask import Blueprint
 from datetime import datetime
 from flask import current_app, request, jsonify
 
@@ -65,7 +64,7 @@ def create_meditation_session():
     return jsonify({'message': 'Meditation session created successfully'}), 201
 
 
-def validate_meditation_session_data(data):
+def validate_meditation_session_data(data: dict):
     # Validate required fields in the request body
     required_fields = [
         'deviceId',
@@ -90,10 +89,12 @@ def validate_meditation_session_data(data):
         'breathingPatternMultiplier',
         'isHapticFeedbackEnabled',
     ]
+    if len(data['sessionPeriods']) == 0:
+        return None, ({'error': f'Session period list is empty.'}, 400)
     for index, period in enumerate(data['sessionPeriods']):
         for field in required_fields_in_session_periods:
             if field not in period:
-                return None, ({'error': f'Missing required field: {field} in session period at index {index}'}, 400)
+                return None, ({'error': f"Missing required field '{field}' in session period at index {index}"}, 400)
 
         required_fields_in_heart_rate_measurements = [
             'date',
@@ -102,8 +103,8 @@ def validate_meditation_session_data(data):
         for index2, measurement in enumerate(period['heartRateMeasurements']):
             for field in required_fields_in_heart_rate_measurements:
                 if field not in measurement:
-                    return None, ({'error': f'Missing required field: {field} in heart rate measurement at index '
-                                            f'{index2} in session period at index {index}'},
+                    return None, ({'error': f"Missing required field '{field}' in heart rate measurement at index "
+                                            f"{index2} in session period at index {index}"},
                                   400)
 
     return data, None
