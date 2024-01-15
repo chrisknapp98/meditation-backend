@@ -82,6 +82,15 @@ server.
 
 ## Extend Backend
 
+When making changes to the Python code, it's advisable to run the database using Docker Compose and execute the Python 
+application either directly in the IDE or through the command line. 
+It's important to note that all the required environment variables defined in `integration/.env.template` for the backend 
+should be set.
+
+To start only the database using the Docker Compose setup, you can use the following command:
+
+`docker compose up -d database`
+
 ### Editing/Adding Endpoints
 
 The endpoints of the REST server are defined in the `src/routes` package. A separate module has been created for each type of route. For a new endpoint of an already existing type, the corresponding module can be extended with a method for the new endpoint. If a new type of endpoint is to be added, it is advisable to create a new Python module.
