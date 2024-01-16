@@ -24,6 +24,18 @@ It consists of a REST server, a database, and an LSTMK machine learning model.
   * [Continuous Deployment](#continuous-deployment-)
 <!-- TOC -->
 
+# System architecture overview
+
+![Systemarchitektur](./images/architecture.png)
+
+In the presented system architecture, a Client-Server model is employed, featuring a Flutter app as the client and a REST server component built with Flask in Python as the service provider. The Flutter app serves as the client, interacting with the REST server offering services.
+
+The REST server is implemented in Python using Flask. The server component includes User-Data-Routes for managing app user data, LSTM-Routes for machine-learning-related functions, and Service-Routes handling meditation data. All specific data is stored in a MariaDB database, and Docker is utilized for containerization, offering advantages such as portability and consistency across environments.
+
+The communication between components involves JSON over HTTPS for both requests and responses, ensuring secure data transfer.
+
+This architecture aims to create a well-organized system, withtechnologies like Flutter, Flask, MariaDB, and Docker to provide a robust and scalable solution.
+
 # Deployment
   
 ## deployment using docker compose  
