@@ -1,4 +1,6 @@
 import logging
+from enum import Enum
+
 from flask import request, jsonify, Blueprint
 import numpy as np
 import lstm.meditation_lstm as meditation_lstm
@@ -7,8 +9,20 @@ from routes.meditation_routes import (validate_meditation_session_data, get_last
 
 lstm_routes = Blueprint('lstm_routes', __name__)
 
-# This route predicts the next best session configuration (combination of binaural beats, visualization and breath frequency) 
-# based on the last two time units of the session.
+
+class Visualization(Enum):
+    Arctic = 0
+    Aurora = 1
+    Circle = 2
+    City = 3
+    Golden = 4
+    Japan = 5
+    Metropolis = 6
+    Nature = 7
+    Plants = 8
+    Skyline = 9
+
+
 @lstm_routes.route("/predict", methods=['POST'])
 def predict():
     request_data = request.json
@@ -23,7 +37,8 @@ def predict():
     # get all meditation sessions for device_id from db
     all_sessions = get_all_sessions_from_db(device_id)
     if len(all_sessions) < 2:
-        return jsonify({'message': 'Couldn\'t predict best combination for ' + device_id + '. Not enough data available.'})
+        return jsonify(
+            {'message': 'Couldn\'t predict best combination for ' + device_id + '. Not enough data available.'})
 
     session_periods = []
     if len(validated_data['sessionPeriods']) < 2:
@@ -66,14 +81,15 @@ def train_model():
             logging.error('An error occurred while saving a session: %s', e)
             return jsonify({'error': 'An error occurred while saving a session.'}), 500
         if not previous_sessions:
-            return jsonify({'message': 'Session saved, but Model for device ' + validated_data['deviceId'] + ' was not trained as no previous session was found.'})
+            return jsonify({'message': 'Session saved, but Model for device ' + validated_data[
+                'deviceId'] + ' was not trained as no previous session was found.'})
 
         combined_session_periods = validated_data['sessionPeriods'].copy()
         previous_sessions.reverse()
         # Iterate over the reversed previous_sessions and add periods until batch_size is reached
         for session in previous_sessions:
-            if len(combined_session_periods) < training_data_arr_size:
-                additional_periods_needed = training_data_arr_size - len(combined_session_periods)
+            if len(combined_session_periods) < meditation_lstm.TRAINING_DATA_ARR_SIZE:
+                additional_periods_needed = meditation_lstm.TRAINING_DATA_ARR_SIZE - len(combined_session_periods)
                 session_periods = session.to_dict()['sessionPeriods']
                 # Take only as many periods as needed from this session
                 combined_session_periods.extend(session_periods[:additional_periods_needed])
@@ -83,7 +99,8 @@ def train_model():
         training_data_arr = map_session_periods_to_training_data(combined_session_periods)
         logging.info("Length of training_data_arr: " + str(len(training_data_arr)))
     else:
-        return jsonify({'message': 'Model for device ' + validated_data['deviceId'] + ' not trained. Session did not complete.'})
+        return jsonify(
+            {'message': 'Model for device ' + validated_data['deviceId'] + ' not trained. Session did not complete.'})
 
     training_data = np.array(training_data_arr)
 
@@ -104,7 +121,8 @@ def map_session_periods_to_prediction_array(session_periods):
     for period in session_periods:
         heart_rate_arr += [hrm['heartRate'] for hrm in period['heartRateMeasurements']]
         binaural_beats_arr += [period['beatFrequency']] * number_of_heart_rate_entries_per_period
-        visualization_arr += [get_visualization_number(period['visualization'])] * number_of_heart_rate_entries_per_period
+        visualization_arr += [get_visualization_number(
+            period['visualization'])] * number_of_heart_rate_entries_per_period
         breath_multiplier_arr += [period['breathingPatternMultiplier']] * number_of_heart_rate_entries_per_period
 
     # print length of each array
@@ -115,7 +133,16 @@ def map_session_periods_to_prediction_array(session_periods):
 
     return [heart_rate_arr, binaural_beats_arr, visualization_arr, breath_multiplier_arr]
 
-def map_session_periods_to_training_data(session_periods):
+
+def map_session_periods_to_training_data(session_periods: dict):
+    """
+    Maps session periods to training data.
+    :param session_periods: A list of dictionaries representing session periods, where each dictionary
+                            contains information about heart rate measurements, beat frequency, visualization,
+                            and breathing pattern multiplier.
+    :return: A list of lists containing training data. Each inner list represents a period and includes the
+              following data for each time point within the period.
+    """
     training_data = []
     for period in session_periods:
         heart_rate_data = [hrm['heartRate'] for hrm in period['heartRateMeasurements']]
@@ -125,30 +152,16 @@ def map_session_periods_to_training_data(session_periods):
         training_data.append([heart_rate_data, beat_frequency_data, visualization_data, multiplier_data])
     return training_data
 
-# List of tuples for visualization mapping
-visualization_list = [
-    ('Arctic', 0),
-    ('Aurora', 1),
-    ('Circle', 2),
-    ('City', 3),
-    ('Golden', 4),
-    ('Japan', 5),
-    ('Metropolis', 6),
-    ('Nature', 7),
-    ('Plants', 8),
-    ('Skyline', 9),
-]
 
-# Convert to dictionaries for easy lookup
-visualization_mapping_str_to_num = dict(visualization_list)
-visualization_mapping_num_to_str = {num: name for name, num in visualization_list}
+def get_visualization_number(visualization_name: str):
+    """
+    Convert visualization name to its corresponding number.
+    """
+    return Visualization[visualization_name.capitalize()].value
 
-def get_visualization_number(visualization_name):
-    """Convert visualization name to its corresponding number."""
-    return visualization_mapping_str_to_num.get(visualization_name, 0)
 
-def get_visualization_name(visualization_number):
-    """Convert visualization number back to its corresponding name."""
-    return visualization_mapping_num_to_str.get(visualization_number)
-
-training_data_arr_size = 40
+def get_visualization_name(visualization_number: int):
+    """
+    Convert visualization number back to its corresponding name.
+    """
+    return Visualization(visualization_number).name

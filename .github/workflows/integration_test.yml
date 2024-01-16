@@ -1,7 +1,14 @@
 name: integration-tests
 
-on: [push]
-
+on:
+  push:
+    paths:
+      - src/**
+      - requirements.txt
+      - Dockerfile
+      - integration/**
+      - .github/workflows/deploy_solution.yml
+      - integration_tests/**
 jobs:
   build:
     runs-on: ubuntu-latest

@@ -16,6 +16,7 @@ MODEL_SAVE_PATH = os.getenv('MODEL_SAVE_PATH', 'models')
 ENABLE_LOG_TRAINING_RESULTS = os.getenv('ENABLE_LOG_TRAINING_RESULTS', 'False').lower() == 'true'
 logging.basicConfig(level=getattr(logging, os.getenv('LOG_LEVEL', 'DEBUG')))
 
+TRAINING_DATA_ARR_SIZE: int = 40
 
 # Predict the next heart rate for a given user based on the last two time units of the session.
 def predict_next_heart_rate(session_data_two_time_units, user_id):
