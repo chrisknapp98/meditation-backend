@@ -23,8 +23,8 @@ It consists of a REST server, a database, and an LSTM machine learning model.
 * [CI/CD pipeline](#cicd-pipeline-)
   * [Integration tests within CI/CD pipeline](#integration-tests-within-cicd-pipeline-)
   * [Continuous Deployment](#continuous-deployment-)
-* [Machine Learning architecture](#machine-learning-architecure-)
-* [Project presentation](#project-presentation-)
+* [Machine Learning architecture](#machine-learning-architecure)
+* [Project presentation](#project-presentation)
 <!-- TOC -->
 
 # System architecture overview
@@ -200,5 +200,5 @@ Zooming into the LSTM network's details, the architecture of the actual LSTM mod
 The neural network comprises multiple layers sequentially connected. On the left, the input data consists of four meditation parameterizations across 45 time steps. Initially, these enter the first LSTM layer with 64 neurons, capturing the temporal dependencies in the data. Subsequently, a Fully-Connected layer with 8 neurons and a ReLU activation function follows, adept at modeling non-linear relationships. Next in line is another Fully-Connected layer with one neuron and linear activation, well-suited for regression problems where the output is a metric-scaled value. The ultimate output of the neural network is the heart rate.
 
 # Project presentation
-The presentation for the entire project took place on January 10, 2024 at HTW Berlin.
+The presentation for the entire project took place on January 10, 2024 at HTW Berlin..
 [Link to presentation as pdf](presentation/Meditationsapp_praesi.pdf)
