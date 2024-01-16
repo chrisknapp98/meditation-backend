@@ -9,6 +9,7 @@ It consists of a REST server, a database, and an LSTMK machine learning model.
 <!-- TOC -->
 * [MindSync Backend](#mindsync-backend-)
   * [Table of contents](#table-of-contents-)
+* [System architecture overview](#system-architecture-overview)
 * [Deployment](#deployment)
   * [deployment using docker compose](#deployment-using-docker-compose-)
   * [deploy manually](#deploy-manually-)
@@ -22,9 +23,12 @@ It consists of a REST server, a database, and an LSTMK machine learning model.
 * [CI/CD pipeline](#cicd-pipeline-)
   * [Integration tests within CI/CD pipeline](#integration-tests-within-cicd-pipeline-)
   * [Continuous Deployment](#continuous-deployment-)
+* [Machine Learning architecture](#cicd-pipeline-)
 <!-- TOC -->
 
 # System architecture overview
+
+This diagram is intended to provide you an overview of the fundamental architecture of the entire system.
 
 ![Systemarchitektur](./images/architecture.png)
 
@@ -175,3 +179,18 @@ This is implemented in the file `.github/workflows/deploy_solution.yml`. When th
 SSH connection is established to the VServer, and the [deployment script](#start-solution-using-script) is executed.  
   
 
+# Machine learning architecure
+
+This diagram is intended to provide you an overview of the fundamental architecture of the machine learning.
+
+![Systemarchitektur](./images/ml1.png)
+
+In the shown Machine Learning architecture, the visualization outlines the fundamental structure. During meditation data like heart rate, binaural beats, breathing multiplier, and visualization type over time, are captured over time. Long Short-Term Memory networks (LSTMs) are perfect for such time-series data. LSTMs are widely used in time-series analysis, forecasting, and language modeling due to their efficacy in handling temporal dependencies.
+
+LSTMs in this context take arrays as input, formed by parameters over time during meditation. The LSTM processes the data, utilizing the last 60 seconds' meditation data as a base and combining it with a proposed next meditation configuration (Shape 3 (data points) x 4 (parameters) x 15 time steps). An optimization loop integrates 50 random suggestions with past session data into the LSTM. This process occurs in the Predict method of the LSTM network, treating the minimum heart rate as the target, means it is a regression problem. The final outcome is the optimal configuration where the model delivers the lowest recorded heart rate.
+
+Zooming into the LSTM network's details, the architecture of the actual LSTM model is shown in the next visualization.
+
+![Systemarchitektur](./images/ml2.png)
+
+The neural network comprises multiple layers sequentially connected. On the left, the input data consists of four meditation parameterizations across 45 time steps. Initially, these enter the first LSTM layer with 64 neurons, capturing the temporal dependencies in the data. Subsequently, a Fully-Connected layer with 8 neurons and a ReLU activation function follows, adept at modeling non-linear relationships. Next in line is another Fully-Connected layer with one neuron and linear activation, well-suited for regression problems where the output is a metric-scaled value. The ultimate output of the neural network is the heart rate.
