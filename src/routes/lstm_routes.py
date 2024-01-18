@@ -66,6 +66,8 @@ def predict():
 @lstm_routes.route("/train_model", methods=['POST'])
 def train_model():
     device_id: str = request.args.get('deviceId')
+    if device_id is None or len(device_id) == 0:
+        return jsonify({'error': 'No device id provided.'}), 400
     print(f"Request on /train_model received from device with id: {device_id}")
     previous_sessions = get_all_sessions_from_db(device_id)
     if not previous_sessions:

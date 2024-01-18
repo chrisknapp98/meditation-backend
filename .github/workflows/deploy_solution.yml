@@ -9,6 +9,7 @@ on:
       - .github/workflows/deploy_solution.yml
 jobs:
   build:
+    if: false # disable job because public server is not available
     name: Build
     runs-on: ubuntu-latest
     environment: continuous-deployment
