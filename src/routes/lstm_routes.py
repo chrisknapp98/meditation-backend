@@ -25,6 +25,8 @@ class Visualization(Enum):
 
 @lstm_routes.route("/predict", methods=['POST'])
 def predict():
+    print(request.json)
+
     request_data = request.json
 
     validated_data, error = validate_meditation_session_data(request_data)
@@ -51,10 +53,9 @@ def predict():
     session_data_two_time_units = np.array(prediction_formatted_session_periods)
 
     prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units, device_id)
-
-    # Debugging: print the predicted visualization number
-    logging.info("Predicted visualization number:", prediction[2][0])
-
+    if prediction is None:
+        return jsonify({'message': f'Could not predict best combination for {device_id}. '
+                                   f'User does not have any model yet.'}), 400
     return jsonify({'bestCombination': {
         'beatFrequency': prediction[1][0],
         'visualization': get_visualization_name(int(prediction[2][0])),
