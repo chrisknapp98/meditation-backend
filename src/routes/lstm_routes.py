@@ -25,6 +25,8 @@ class Visualization(Enum):
 
 @lstm_routes.route("/predict", methods=['POST'])
 def predict():
+    print(request.json)
+
     request_data = request.json
 
     validated_data, error = validate_meditation_session_data(request_data)
@@ -51,10 +53,9 @@ def predict():
     session_data_two_time_units = np.array(prediction_formatted_session_periods)
 
     prediction = meditation_lstm.predict_next_heart_rate(session_data_two_time_units, device_id)
-
-    # Debugging: print the predicted visualization number
-    logging.info("Predicted visualization number:", prediction[2][0])
-
+    if prediction is None:
+        return jsonify({'message': f'Could not predict best combination for {device_id}. '
+                                   f'User does not have any model yet.'}), 400
     return jsonify({'bestCombination': {
         'beatFrequency': prediction[1][0],
         'visualization': get_visualization_name(int(prediction[2][0])),
@@ -65,51 +66,31 @@ def predict():
 # This route trains the model with the given training data.
 @lstm_routes.route("/train_model", methods=['POST'])
 def train_model():
-    print("Request on /train_model received.")
-    request_data = request.json
-
-    validated_data, error = validate_meditation_session_data(request_data)
-    if error:
-        error_message, status_code = error
-        return jsonify(error_message), status_code
-
-    if validated_data['isCompleted']:
-        previous_sessions = get_all_sessions_from_db(validated_data['deviceId'])
-        try:
-            save_session_to_db(validated_data)
-        except Exception as e:
-            logging.error('An error occurred while saving a session: %s', e)
-            return jsonify({'error': 'An error occurred while saving a session.'}), 500
-        if not previous_sessions:
-            return jsonify({'message': 'Session saved, but Model for device ' + validated_data[
-                'deviceId'] + ' was not trained as no previous session was found.'})
-
-        combined_session_periods = validated_data['sessionPeriods'].copy()
-        previous_sessions.reverse()
-        # Iterate over the reversed previous_sessions and add periods until batch_size is reached
-        for session in previous_sessions:
-            if len(combined_session_periods) < meditation_lstm.TRAINING_DATA_ARR_SIZE:
-                additional_periods_needed = meditation_lstm.TRAINING_DATA_ARR_SIZE - len(combined_session_periods)
-                session_periods = session.to_dict()['sessionPeriods']
-                # Take only as many periods as needed from this session
-                combined_session_periods.extend(session_periods[:additional_periods_needed])
-            else:
-                break
-
-        training_data_arr = map_session_periods_to_training_data(combined_session_periods)
-        logging.info("Length of training_data_arr: " + str(len(training_data_arr)))
-    else:
+    device_id: str = request.args.get('deviceId')
+    if device_id is None or len(device_id) == 0:
+        return jsonify({'error': 'No device id provided.'}), 400
+    print(f"Request on /train_model received from device with id: {device_id}")
+    previous_sessions = get_all_sessions_from_db(device_id)
+    if not previous_sessions:
+        return jsonify({'message': f'No previous sessions found for device {device_id}. Could not train model.'})
+    previous_sessions.reverse()
+    session_periods: list = []
+    # Iterate over the reversed previous_sessions and add periods until batch_size is reached
+    for session in previous_sessions:
+        if len(session_periods) < meditation_lstm.TRAINING_DATA_ARR_SIZE:
+            session_periods.extend(session.to_dict()['sessionPeriods'])
+        else:
+            break
+    if len(session_periods) < meditation_lstm.TRAINING_DATA_ARR_SIZE:
         return jsonify(
-            {'message': 'Model for device ' + validated_data['deviceId'] + ' not trained. Session did not complete.'})
-
+            {'message': f'Model for device "{device_id}" not trained. Could not find enough previous sessions.'})
+    training_data_arr = map_session_periods_to_training_data(session_periods[:meditation_lstm.TRAINING_DATA_ARR_SIZE])
     training_data = np.array(training_data_arr)
 
     logging.info("Shape of training_data_arr: " + str(np.shape(training_data)))
-    device_id = validated_data['deviceId']
 
     meditation_lstm.train_model_with_session_data(training_data, device_id)
-
-    return jsonify({'message': 'Model for device ' + device_id + ' trained successfully.'})
+    return jsonify({'message': f'Model for device {device_id} trained successfully.'})
 
 
 def map_session_periods_to_prediction_array(session_periods):

@@ -11,8 +11,10 @@ ${PREDICT_URI}  /predict
 &{DEVICE_ID_DICT}  deviceId=${DEVICE_ID}
 
 ${NO_MEDITAIONS_FOUND_TEXT}  No meditation sessions found
+${MEDITAION_SESSION_CREATED_TEXT}  Meditation session created successfully
 ${MODEL_TRAINED_TEXT}  Model for device {device_id} trained successfully.
-${NO_PREVIOUS_SESSION_FOUND}  Session saved, but Model for device {device_id} was not trained as no previous session was found.
+${COULD_NOT_TRAIN_MODEL}  Model for device "{device_id}" not trained. Could not find enough previous sessions.
+${NO_PREVIOUS_SESSION_FOUND}  No previous sessions found for device {device_id}. Could not train model.
 ${NOT_ENOUGH_DATA_TEXT}  Couldn't predict best combination for {device_id}. Not enough data available.
 
 *** Settings ***
@@ -32,6 +34,7 @@ Generate UUID
     Set Suite Variable  ${DEVICE_ID}
     ${TRAIN_MODEL_PAYLOAD}=  Set To Dictionary    ${TRAIN_MODEL_PAYLOAD}  deviceId=${DEVICE_ID}
     ${PREDICT_PAYLOAD}=  Set To Dictionary    ${PREDICT_PAYLOAD}  deviceId=${DEVICE_ID}
+    Set To Dictionary    ${DEVICE_ID_DICT}  deviceId=${DEVICE_ID}
 
 Get All Sessions By Device Id No Sessions Created
     [Documentation]  Get all sessions for a device id which has no data stored yet.
@@ -49,24 +52,44 @@ Predict Before Sessions Stored
 
 Train Model No Previous Session
     [Documentation]  Sends the first chunk of training data. The backend should respond, that no previous data was found.
-    ${response}=    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  json=${TRAIN_MODEL_PAYLOAD}
+    ${response}=    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  params=${DEVICE_ID_DICT}
     ...                             expected_status=200
     ${EXPECTED_MESSAGE}=  Format String  ${NO_PREVIOUS_SESSION_FOUND}  device_id=${DEVICE_ID}
     Should Be Equal  ${EXPECTED_MESSAGE}  ${response.json()}[message]
 
+Store Sessions
+    [Documentation]  Send the first chunk of training data
+    ${response}=    Post On Session  meditation-backend  ${MEDITAIONS_URI}  json=${TRAIN_MODEL_PAYLOAD}
+    ...                             expected_status=201
+    Should Be Equal  ${MEDITAION_SESSION_CREATED_TEXT}  ${response.json()}[message]
+
+Train Model Not Enough Data
+    [Documentation]  Send request to train the model. The server should respond that there are not enough training data
+    ...              available yet.
+    ${response}=    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  params=${DEVICE_ID_DICT}
+    ...                             expected_status=200
+    ${EXPECTED_MESSAGE}=  Format String  ${COULD_NOT_TRAIN_MODEL}  device_id=${DEVICE_ID}
+    Should Be Equal  ${EXPECTED_MESSAGE}  ${response.json()}[message]
+
+Store Sessions Again
+    [Documentation]  Send the second chunk of training data to make sure that the model can be trained.
+    ${response}=    Post On Session  meditation-backend  ${MEDITAIONS_URI}  json=${TRAIN_MODEL_PAYLOAD}
+    ...                             expected_status=201
+    Should Be Equal  ${MEDITAION_SESSION_CREATED_TEXT}  ${response.json()}[message]
+
 Train Model
-    [Documentation]  Send the second chunk of training data. Since there is already data stored in the database, there
-    ...              should be no additional hint.
-    ${response}=    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  json=${TRAIN_MODEL_PAYLOAD}
+    [Documentation]  Send request to train the model. The server should respond that there are not enough training data
+    ...              available yet.
+    ${response}=    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  params=${DEVICE_ID_DICT}
     ...                             expected_status=200
     ${EXPECTED_MESSAGE}=  Format String  ${MODEL_TRAINED_TEXT}  device_id=${DEVICE_ID}
     Should Be Equal  ${EXPECTED_MESSAGE}  ${response.json()}[message]
 
 Train Model Empty Device Id
     [Documentation]  Sends a training payload with an empty device id. The server should respond with an error.
-    ${TRAIN_MODEL_EMPTY_DEVICE_ID}=  Copy Dictionary  ${TRAIN_MODEL_PAYLOAD}  deep_copy=${True}
-    ${TRAIN_MODEL_EMPTY_DEVICE_ID}[deviceId]=  Set Variable    ${EMPTY}
-    ${response}=    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  json=${TRAIN_MODEL_EMPTY_DEVICE_ID}
+    ${EMPTY_DEVICE_ID_DICT}=  Copy Dictionary  ${DEVICE_ID_DICT}  deep_copy=${True}
+    ${EMPTY_DEVICE_ID_DICT}[deviceId]=  Set Variable    ${EMPTY}
+    ${response}=    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  params=${EMPTY_DEVICE_ID_DICT}
     ...                             expected_status=400
 
 Predict After Training
@@ -80,7 +103,7 @@ Predict After Training
     Dictionary Should Contain Key  ${recommended_parameters}  breathingPatternMultiplier
     Dictionary Should Contain Key  ${recommended_parameters}  visualization
 
- Predict Empty Device Id
+Predict Empty Device Id
     [Documentation]    Sends a prediction payload with an empty device id. The server should respond with an error.
     ${PREDICT_PAYLOAD_EMPTY_DEVICE_ID}=  Copy Dictionary  ${PREDICT_PAYLOAD}  deep_copy=${True}
     ${PREDICT_PAYLOAD_EMPTY_DEVICE_ID}[deviceId]=  Set Variable  ${EMPTY}
@@ -88,9 +111,10 @@ Predict After Training
     ...                              expected_status=400
 
 Retrain And Predict Again
-    [Documentation]    Predict after the model has been retrained several times.
-    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  json=${TRAIN_MODEL_PAYLOAD}  expected_status=200
-    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  json=${TRAIN_MODEL_PAYLOAD}  expected_status=200
+    [Documentation]    Predict after new sessions were store and the model has been retrained several times.
+    Post On Session  meditation-backend  ${MEDITAIONS_URI}  json=${TRAIN_MODEL_PAYLOAD}  expected_status=201
+    Post On Session  meditation-backend  ${MEDITAIONS_URI}  json=${TRAIN_MODEL_PAYLOAD}  expected_status=201
+    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  params=${DEVICE_ID_DICT}  expected_status=200
     Post On Session  meditation-backend  ${PREDICT_URI}  json=${PREDICT_PAYLOAD}  expected_status=200
 
 Predict Unexpected Media Type
@@ -98,8 +122,8 @@ Predict Unexpected Media Type
     Post On Session  meditation-backend  ${PREDICT_URI}  data=my test string  expected_status=415
 
 Train Unexpected Media Type
-    [Documentation]    Send a request using a plain string instead of a JSON-formatted string.
-    Post On Session  meditation-backend  ${TRAIN_MODEL_URI}  data=my test string  expected_status=415
+    [Documentation]    Send a request for storing session data using a plain string instead of a JSON-formatted string.
+    Post On Session  meditation-backend  ${MEDITAIONS_URI}  data=my test string  expected_status=415
 
 Train Empty Session Periods List
     [Documentation]    Sends a training request with an empty sessionPeriods list.
